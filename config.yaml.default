@@ -1,0 +1,5 @@
+log:
+  # The Log level configuration, one of: debug/info/warn/error/panic/fatal
+  level: debug
+  # The Log file dir of the coraza-server
+  dir: /var/logs/coraza-server
