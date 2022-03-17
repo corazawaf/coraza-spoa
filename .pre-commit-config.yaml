@@ -8,8 +8,8 @@ repos:
       - id: go-lint
       - id: go-imports
       - id: go-cyclo
-        args: [-over=15]
+        args: [-over=37]
       - id: golangci-lint
-      - id: go-critic
+      # - id: go-critic
       - id: go-unit-tests
       - id: go-mod-tidy

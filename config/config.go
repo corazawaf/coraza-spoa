@@ -31,7 +31,8 @@ func init() {
 
 // Config is used to configure coraza-server.
 type Config struct {
-	Log Log `yaml:"log"`
+	Log  Log  `yaml:"log"`
+	SPOA SPOA `yaml:"spoa"`
 
 	// ConfigFile is the configuration file of the coraza-server.
 	ConfigFile string
@@ -41,6 +42,14 @@ type Config struct {
 type Log struct {
 	Level string `yaml:"level"`
 	Dir   string `yaml:"dir"`
+}
+
+// SPOA is used to manage the haproxy configuration and waf rules.
+type SPOA struct {
+	Bind                   string   `yaml:"bind"`
+	Include                []string `yaml:"include"`
+	TransactionTTL         int      `yaml:"transaction_ttl"`
+	TransactionActiveLimit int      `yaml:"transaction_active_limit"`
 }
 
 // InitConfig initializes the configuration.

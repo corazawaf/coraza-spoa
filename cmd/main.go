@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"github.com/corazawaf/coraza-spoa/config"
+	"github.com/corazawaf/coraza-spoa/internal"
 	"github.com/corazawaf/coraza-spoa/pkg/logger"
 )
 
@@ -30,5 +31,14 @@ func main() {
 	flag.Parse()
 	if err := config.InitConfig(); err != nil {
 		panic(err)
+	}
+
+	spoa, err := internal.New(&config.C.SPOA)
+	if err != nil {
+		logger.Fatal(err.Error())
+	}
+
+	if err = spoa.Start(); err != nil {
+		logger.Fatal(err.Error())
 	}
 }
