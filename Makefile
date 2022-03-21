@@ -11,3 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+.DEFAULT_GOAL := build
+
+HOST_ARCH = $(shell which go >/dev/null 2>&1 && go env GOARCH)
+ARCH ?= $(HOST_ARCH)
+ifeq ($(ARCH),)
+    $(error mandatory variable ARCH is empty, either set it when calling the command or make sure 'go env GOARCH' works)
+endif
+
+HOST_OS = $(shell which go >/dev/null 2>&1 && go env GOOS)
+OS ?= $(HOST_OS)
+ifeq ($(OS),)
+	$(error mandatory variable OS is empty, either set it when calling the cammand or make sure 'go env GOOS' works)
+endif
+
+EXECUTABLE_FILE = coraza-server
+CONFIGURATION_FILE = config.yaml
+
+.PHONY: build
+build:
+	@GOARCH=$(ARCH) go build -o $(EXECUTABLE_FILE) cmd/main.go
+	@cp config.yaml.default $(CONFIGURATION_FILE)
+
+.PHONY: clean
+clean: $(BUILD_FILES)
+	@rm -rf $(EXECUTABLE_FILE)
+	@rm -rf $(CONFIGURATION_FILE)
+
+

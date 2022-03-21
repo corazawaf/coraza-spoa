@@ -1,6 +1,6 @@
 module github.com/corazawaf/coraza-spoa
 
-go 1.17
+go 1.18
 
 require (
 	github.com/bluele/gcache v0.0.2
