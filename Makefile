@@ -26,17 +26,14 @@ ifeq ($(OS),)
 	$(error mandatory variable OS is empty, either set it when calling the cammand or make sure 'go env GOOS' works)
 endif
 
-EXECUTABLE_FILE = coraza-server
-CONFIGURATION_FILE = config.yaml
+EXECUTABLE_FILE = coraza-spoa
 
 .PHONY: build
 build:
 	@GOARCH=$(ARCH) go build -o $(EXECUTABLE_FILE) cmd/main.go
-	@cp config.yaml.default $(CONFIGURATION_FILE)
 
 .PHONY: clean
 clean: $(BUILD_FILES)
 	@rm -rf $(EXECUTABLE_FILE)
-	@rm -rf $(CONFIGURATION_FILE)
 
 

@@ -26,7 +26,7 @@ import (
 var C Config
 
 func init() {
-	flag.StringVar(&C.ConfigFile, "config-file", "./config.yml", "The configuration file of the coraza-spoa. (default: ./config.yml)")
+	flag.StringVar(&C.ConfigFile, "config-file", "./config.yml", "The configuration file of the coraza-spoa.")
 }
 
 // Config is used to configure coraza-server.
