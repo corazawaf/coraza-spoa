@@ -65,6 +65,12 @@ func InitConfig() error {
 		return err
 	}
 
+	// validate the configuration
+	err = validateConfig()
+	if err != nil {
+		return err
+	}
+
 	// set the log configuration
 	initLog()
 
@@ -105,4 +111,23 @@ func initLog() {
 
 	// reset default logger for using global logger
 	logger.NewTeeWithRotate(tops).Reset()
+}
+
+func validateConfig() error {
+	if C.Log.Dir == "" {
+		C.Log.Dir = "./logs"
+	}
+
+	if C.Log.Level == "" {
+		C.Log.Level = "warn"
+	}
+
+	if C.SPOA.TransactionTTL <= 0 {
+		return fmt.Errorf("SPOA transaction ttl must be greater than 0")
+	}
+
+	if C.SPOA.TransactionActiveLimit <= 0 {
+		return fmt.Errorf("SPOA transaction active limit must be greater than 0")
+	}
+	return nil
 }
