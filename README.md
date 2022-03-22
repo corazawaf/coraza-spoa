@@ -12,6 +12,9 @@ The command `make` will compile the source code and produce the executable file 
 ### Clean
 When you need to re-compile the source code, you can use the command `make clean` to clean the executable file.
 
+## Configuration file
+The example configuration file is `config.yml.default`, you can copy it and modify the related configuration information.
+
 ## Start the service
 After you have compiled it, you can start the service by running the command `./coraza-spoa`.
 ```shell
@@ -20,9 +23,6 @@ Usage of ./coraza-spoa:
   -config-file string
         The configuration file of the coraza-spoa. (default "./config.yml")
 ```
-
-## Configure the service
-The example configuration file is `config.yml.default`, you can copy it and modify the related configuration information.
 
 ## Configure a SPOE to use the service
 Here is the configuration template to use for your SPOE with OWASP Coraza module, you can find it in the "doc/config/coraza.cfg":
@@ -56,7 +56,7 @@ frontend coraza.io
     ...
 ```
 
-Because, in SPOE configuration file, we declare to use the backend "coraza-spoa"(of course, you can change it to any other backend) to communicate with the service, so we need to define it in the HAProxy file. For example:
+Because, in SPOE configuration file, we declare to use the backend "coraza-spoa" to communicate with the service, so we need to define it in the HAProxy file. For example:
 ```editorconfig
 backend coraza-spoa
     mod tcp
