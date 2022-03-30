@@ -96,7 +96,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, err
 			}
 		default:
-			logger.Warn(fmt.Sprintf("invalid message on the http frontend response, name: %s, value: %s", arg.Name, arg.Value))
+			logger.Warn(fmt.Sprintf("invalid message on the http response, name: %s, value: %s", arg.Name, arg.Value))
 		}
 	}
 
