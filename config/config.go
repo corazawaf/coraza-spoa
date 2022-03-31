@@ -113,7 +113,7 @@ func initLog() {
 	}
 
 	// reset default logger for using global logger
-	logger.NewTeeWithRotate(tops).Reset()
+	logger.NewTeeWithRotate(tops, logger.WithCaller(true)).Reset()
 }
 
 func validateConfig() error {
