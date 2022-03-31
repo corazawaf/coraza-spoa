@@ -90,9 +90,13 @@ func initLog() {
 			Lef: func(level logger.Level) bool {
 				l, err := logger.ParseLevel(C.Log.Level)
 				if err != nil {
-					panic(err)
+					l = logger.InfoLevel
 				}
-				return level >= l && level < logger.ErrorLevel
+				if level < logger.ErrorLevel {
+					return l <= level
+				}
+
+				return false
 			},
 		},
 		{

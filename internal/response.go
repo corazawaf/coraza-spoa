@@ -65,7 +65,8 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 		case "version":
 			version, ok = arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for http response version, string expected, got %v", arg.Value)
+				logger.Error(fmt.Sprintf("invalid argument for http response version, string expected, got %v", arg.Value))
+				version = "1.1"
 			}
 		case "status":
 			status, ok = arg.Value.(int)
@@ -75,7 +76,8 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 		case "headers":
 			value, ok := arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for http response headers, string expected, got %v", arg.Value)
+				logger.Error(fmt.Sprintf("invalid argument for http response headers, string expected, got %v", arg.Value))
+				value = ""
 			}
 			headers, err := s.readHeaders(value)
 			if err != nil {

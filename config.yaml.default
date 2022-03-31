@@ -1,17 +1,17 @@
 log:
   # The Log level configuration, one of: debug/info/warn/error/panic/fatal
-  level: error
-  # The Log file dir of the coraza-server
-  dir: /var/logs/coraza-server
+  level: info
+  # The Log file dir of the coraza-spoa
+  dir: /var/logs/coraza-spoa
 
 spoa:
   # The SPOA server bind address
   bind: 0.0.0.0:9000
   # The waf rules file path
   include:
-    - /etc/coraza-server/coraza.conf
-    - /etc/coraza-server/crs-setup.conf
-    - /etc/coraza-server/rules/*.conf
+    - /etc/coraza-spoa/coraza.conf
+    - /etc/coraza-spoa/crs-setup.conf
+    - /etc/coraza-spoa/rules/*.conf
   # The transaction cache lifetime(ms)
   transaction_ttl: 60000
   # The transaction cache limit

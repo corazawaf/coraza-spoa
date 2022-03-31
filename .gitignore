@@ -16,3 +16,4 @@ vendor/
 # local files
 config.yaml
 logs/
+rules/

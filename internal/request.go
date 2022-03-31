@@ -28,9 +28,9 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 	var (
 		ok      bool
 		method  = ""
-		path    = ""
+		path    = "/"
 		query   = ""
-		version = ""
+		version = "1.1"
 		tx      = new(coraza.Transaction)
 	)
 
@@ -61,22 +61,26 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		case "path":
 			path, ok = arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for http request path, string expected, got %v", arg.Value)
+				logger.Error(fmt.Sprintf("invalid argument for http request path, string expected, got %v", arg.Value))
+				path = "/"
 			}
 		case "query":
 			query, ok = arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for http request query, string expected, got %v", arg.Value)
+				logger.Error(fmt.Sprintf("invalid argument for http request query, string expected, got %v", arg.Value))
+				query = ""
 			}
 		case "version":
 			version, ok = arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for http request version, string expected, got %v", arg.Value)
+				logger.Error(fmt.Sprintf("invalid argument for http request version, string expected, got %v", arg.Value))
+				version = "1.1"
 			}
 		case "headers":
 			value, ok := arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for http request headers, string expected, got %v", arg.Value)
+				logger.Error(fmt.Sprintf("invalid argument for http request headers, string expected, got %v", arg.Value))
+				value = ""
 			}
 
 			headers, err := s.readHeaders(value)
