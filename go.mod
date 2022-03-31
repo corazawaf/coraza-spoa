@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/bluele/gcache v0.0.2
-	github.com/corazawaf/coraza/v2 v2.0.0-rc.3
+	github.com/corazawaf/coraza/v2 v2.0.0
 	github.com/criteo/haproxy-spoe-go v1.0.6
 	github.com/jptosso/coraza-pcre v0.0.0-20220316151810-593842e5f465
 	go.uber.org/zap v1.21.0

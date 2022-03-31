@@ -72,5 +72,5 @@ The OWASP Coraza action is returned in a variable named "txn.coraza.fail". It co
 http-request deny if { var(txn.coraza.fail) -m int eq 1 }
 http-response deny if { var(txn.coraza.fail) -m int eq 1 }
 ```
-With this rule, all the requests not clean are rejected. You can find the example HAProxy configuration file in the [doc/config/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/haproxy.cfg).
+With this rule, all unsafe requests will be rejected. You can find the example HAProxy configuration file in the [doc/config/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/haproxy.cfg).
 
