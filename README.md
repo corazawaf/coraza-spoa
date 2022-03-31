@@ -31,9 +31,9 @@ Here is the configuration template to use for your SPOE with OWASP Coraza module
 spoe-agent coraza-agent
     messages coraza-req coraza-res
     option var-prefix coraza
-    timeout hello 100ms
-    timeout idle 2m
-    timeout processing 15ms
+    timeout hello      100ms
+    timeout idle       2m
+    timeout processing 10ms
     use-backend coraza-spoa
     log global
 
@@ -59,7 +59,7 @@ frontend coraza.io
 Because, in SPOE configuration file, we declare to use the backend "coraza-spoa" to communicate with the service, so we need to define it in the HAProxy file. For example:
 ```editorconfig
 backend coraza-spoa
-    mod tcp
+    mode tcp
     balance roundrobin
     timeout connect 5000ms
     timeout client 5000ms
