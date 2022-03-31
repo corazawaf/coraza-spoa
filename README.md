@@ -38,11 +38,11 @@ spoe-agent coraza-agent
     log global
 
 spoe-message coraza-req
-    args unique-id src method path query req.ver req.hdrs req.body
+    args id=unique-id src-ip=src method=method path=path query=query version=req.ver headers=req.hdrs bodyreq.body
     event on-frontend-http-request
 
 spoe-message coraza-res
-    args unique-id status res.ver res.hdrs res.body
+    args id=unique-id version=res.ver status=status headers=res.hdrs body=res.body
     event on-http-response
 ```
 
