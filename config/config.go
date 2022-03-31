@@ -93,9 +93,8 @@ func initLog() {
 					l = logger.InfoLevel
 				}
 				if level < logger.ErrorLevel {
-					return l <= level
+					return level >= l
 				}
-
 				return false
 			},
 		},
