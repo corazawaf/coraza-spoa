@@ -26,49 +26,63 @@ import (
 
 func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 	var (
-		method   = ""
-		path     = ""
-		query    = ""
-		phase    = 0
-		tx       = new(coraza.Transaction)
-		argNames = []string{"Transaction ID", "Request IP", "Method", "Path", "Query", "HTTP Version",
-			"Request Headers", "Request Body"}
+		ok      bool
+		method  = ""
+		path    = "/"
+		query   = ""
+		version = "1.1"
+		tx      = new(coraza.Transaction)
 	)
 
 	for msg.Args.Next() {
-		var (
-			ok    bool
-			value = ""
-			arg   = msg.Args.Arg
-		)
+		arg := msg.Args.Arg
 
-		if phase != 1 && phase != 7 {
-			value, ok = arg.Value.(string)
-			if !ok {
-				return nil, fmt.Errorf("invalid argument for %s, string expected, got %v", argNames[phase], arg.Value)
-			}
-		}
-
-		switch phase {
-		case 0:
+		switch arg.Name {
+		case "id":
 			tx = s.waf.NewTransaction()
-			tx.ID = value
-			tx.GetCollection(variables.UniqueID).Set("", []string{tx.ID})
-		case 1:
-			if val, ok := arg.Value.(net.IP); !ok {
-				tx.ProcessConnection(val.String(), 0, "", 0)
-			} else {
-				return nil, fmt.Errorf("invalid argument for %s, net.IP expected, got %v", argNames[phase], arg.Value)
+			tx.ID, ok = arg.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
-		case 2:
-			method = value
-		case 3:
-			path = value
-		case 4:
-			query = value
-		case 5:
-			tx.ProcessURI(path+"?"+query, method, "HTTP/"+value)
-		case 6:
+
+			tx.GetCollection(variables.UniqueID).Set("", []string{tx.ID})
+		case "src-ip":
+			value, ok := arg.Value.(net.IP)
+			if !ok {
+				return nil, fmt.Errorf("invalid argument for src ip, net.IP expected, got %v", arg.Value)
+			}
+
+			tx.ProcessConnection(value.String(), 0, "", 0)
+		case "method":
+			method, ok = arg.Value.(string)
+			if !ok {
+				return nil, fmt.Errorf("invalid argument for http request method, string expected, got %v", arg.Value)
+			}
+		case "path":
+			path, ok = arg.Value.(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("invalid argument for http request path, string expected, got %v", arg.Value))
+				path = "/"
+			}
+		case "query":
+			query, ok = arg.Value.(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("invalid argument for http request query, string expected, got %v", arg.Value))
+				query = ""
+			}
+		case "version":
+			version, ok = arg.Value.(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("invalid argument for http request version, string expected, got %v", arg.Value))
+				version = "1.1"
+			}
+		case "headers":
+			value, ok := arg.Value.(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("invalid argument for http request headers, string expected, got %v", arg.Value))
+				value = ""
+			}
+
 			headers, err := s.readHeaders(value)
 			if err != nil {
 				return nil, err
@@ -79,34 +93,34 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 					tx.AddRequestHeader(key, v)
 				}
 			}
-			if it := tx.ProcessRequestHeaders(); it != nil {
-				return s.message(Hit), nil
-			}
-		case 7:
+		case "body":
 			body, ok := arg.Value.([]byte)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for %s, []byte expected, got %v", argNames[phase], arg.Value)
+				return nil, fmt.Errorf("invalid argument for http reqeust body, []byte expected, got %v", arg.Value)
 			}
 
 			_, err := tx.RequestBodyBuffer.Write(body)
 			if err != nil {
 				return nil, err
 			}
-			it, err := tx.ProcessRequestBody()
-			if err != nil {
-				return nil, err
-			}
-			if it != nil {
-				return s.message(Hit), nil
-			}
 		default:
-			return nil, fmt.Errorf("invalid message on the http frontend request, name: %s, value: %s", arg.Name, arg.Value)
+			logger.Warn(fmt.Sprintf("invalid message on the http frontend request, name: %s, value: %s", arg.Name, arg.Value))
 		}
-
-		phase++
 	}
 
-	err := s.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(s.cfg.TransactionTTL))
+	tx.ProcessURI(path+"?"+query, method, "HTTP/"+version)
+	if it := tx.ProcessRequestHeaders(); it != nil {
+		return s.message(Hit), nil
+	}
+	it, err := tx.ProcessRequestBody()
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.message(Hit), nil
+	}
+
+	err = s.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(s.cfg.TransactionTTL))
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
 	}

@@ -31,86 +31,86 @@ func (s *SPOA) resetTX(id string) *coraza.Transaction {
 
 func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 	var (
-		tx            *coraza.Transaction
-		transactionID = ""
-		status        = 0
-		version       = ""
-		phase         = 0
-		argNames      = []string{"Transaction ID", "Response Code", "HTTP Version", "Response Headers", "Response Body"}
+		ok      bool
+		id      = ""
+		status  = 0
+		version = ""
+		tx      = new(coraza.Transaction)
 	)
 	defer func() {
-		s.cache.Remove(transactionID)
+		s.cache.Remove(id)
 	}()
 
 	for msg.Args.Next() {
-		var (
-			ok    bool
-			value = ""
-			arg   = msg.Args.Arg
-		)
+		arg := msg.Args.Arg
 
-		if phase != 1 && phase != 4 {
-			value, ok = arg.Value.(string)
+		switch arg.Name {
+		case "id":
+			id, ok := arg.Value.(string)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for %s, int expected, got %v", argNames[phase], arg.Value)
+				return nil, fmt.Errorf("invalid argument for http response id, string expected, got %v", arg.Value)
 			}
-		}
 
-		switch phase {
-		case 0:
-			transactionID = value
-			txInterface, err := s.cache.Get(transactionID)
+			txInterface, err := s.cache.Get(id)
 			if err != nil {
-				logger.Error("failed to get transaction from cache", logger.String("transaction_id", transactionID), logger.String("error", err.Error()))
-				tx = s.resetTX(transactionID)
+				logger.Error("failed to get transaction from cache", logger.String("transaction_id", id), logger.String("error", err.Error()))
+				tx = s.resetTX(id)
 				break
 			}
 
 			if tx, ok = txInterface.(*coraza.Transaction); ok {
 				break
 			}
-			tx = s.resetTX(transactionID)
-		case 1:
+			tx = s.resetTX(id)
+		case "version":
+			version, ok = arg.Value.(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("invalid argument for http response version, string expected, got %v", arg.Value))
+				version = "1.1"
+			}
+		case "status":
 			status, ok = arg.Value.(int)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for %s, int expected, got %v", argNames[phase], arg.Value)
+				return nil, fmt.Errorf("invalid argument for http response status, int expected, got %v", arg.Value)
 			}
-		case 2:
-			version = value
-		case 3:
+		case "headers":
+			value, ok := arg.Value.(string)
+			if !ok {
+				logger.Error(fmt.Sprintf("invalid argument for http response headers, string expected, got %v", arg.Value))
+				value = ""
+			}
 			headers, err := s.readHeaders(value)
 			if err != nil {
 				return nil, err
 			}
-
 			for key, values := range headers {
 				for _, v := range values {
 					tx.AddResponseHeader(key, v)
 				}
 			}
-			if it := tx.ProcessResponseHeaders(status, "HTTP/"+version); it != nil {
-				return s.message(Hit), nil
-			}
-		case 4:
+		case "body":
 			body, ok := arg.Value.([]byte)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for %s, []byte expected, got %v", argNames[phase], arg.Value)
+				return nil, fmt.Errorf("invalid argument for http response body, []byte expected, got %v", arg.Value)
 			}
 			_, err := tx.ResponseBodyBuffer.Write(body)
 			if err != nil {
 				return nil, err
 			}
-			it, err := tx.ProcessResponseBody()
-			if err != nil {
-				return nil, err
-			}
-			if it != nil {
-				return s.message(Hit), nil
-			}
 		default:
-			return nil, fmt.Errorf("invalid message on the http response, name: %s, value: %s", arg.Name, arg.Value)
+			logger.Warn(fmt.Sprintf("invalid message on the http response, name: %s, value: %s", arg.Name, arg.Value))
 		}
-		phase++
+	}
+
+	if it := tx.ProcessResponseHeaders(status, "HTTP/"+version); it != nil {
+		return s.message(Hit), nil
+	}
+	it, err := tx.ProcessResponseBody()
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.message(Hit), nil
 	}
 
 	return s.message(Miss), nil

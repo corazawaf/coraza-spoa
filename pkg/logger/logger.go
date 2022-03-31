@@ -56,8 +56,7 @@ type Field = zap.Field
 
 // Logger is an alias for zap.Logger. Aliasing this type dramatically
 type Logger struct {
-	l     *zap.Logger
-	level Level
+	l *zap.Logger
 }
 
 func (l *Logger) debug(msg string, fields ...Field) {
@@ -117,8 +116,7 @@ func New(writer io.Writer, level Level, ops ...Option) *Logger {
 		level,
 	)
 	logger := &Logger{
-		l:     zap.New(core, ops...),
-		level: level,
+		l: zap.New(core, ops...),
 	}
 	return logger
 }
