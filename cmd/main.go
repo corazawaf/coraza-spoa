@@ -16,12 +16,10 @@ package main
 
 import (
 	"flag"
+
 	"github.com/corazawaf/coraza-spoa/config"
 	"github.com/corazawaf/coraza-spoa/internal"
 	"github.com/corazawaf/coraza-spoa/pkg/logger"
-
-	// You may uncomment the following lines to enable pcre plugins
-	_ "github.com/jptosso/coraza-pcre"
 )
 
 func main() {
