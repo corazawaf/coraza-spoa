@@ -16,12 +16,13 @@ package internal
 
 import (
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/corazawaf/coraza-spoa/pkg/logger"
 	"github.com/corazawaf/coraza/v2"
 	"github.com/corazawaf/coraza/v2/types/variables"
 	spoe "github.com/criteo/haproxy-spoe-go"
-	"net"
-	"time"
 )
 
 func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
@@ -66,7 +67,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 			}
 		case "query":
 			query, ok = arg.Value.(string)
-			if !ok {
+			if !ok && arg.Value != nil {
 				logger.Error(fmt.Sprintf("invalid argument for http request query, string expected, got %v", arg.Value))
 				query = ""
 			}
