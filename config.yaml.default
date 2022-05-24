@@ -1,17 +1,22 @@
 log:
-  # The Log level configuration, one of: debug/info/warn/error/panic/fatal
+  # The log level configuration, one of: debug/info/warn/error/panic/fatal
   level: info
-  # The Log file dir of the coraza-spoa
-  dir: /var/logs/coraza-spoa
+  # The log file dir of the coraza-spoa
+  dir: /var/log/coraza-spoa
 
 spoa:
   # The SPOA server bind address
   bind: 0.0.0.0:9000
-  # The waf rules file path
+
+  # Get the coraza.conf from https://github.com/corazawaf/coraza
+  #
+  # Download the OWASP CRS from https://github.com/coreruleset/coreruleset/releases
+  # and copy crs-setup.conf & the rules, plugins directories to /etc/coraza-spoa
   include:
     - /etc/coraza-spoa/coraza.conf
     - /etc/coraza-spoa/crs-setup.conf
     - /etc/coraza-spoa/rules/*.conf
+
   # The transaction cache lifetime(ms)
   transaction_ttl: 60000
   # The transaction cache limit
