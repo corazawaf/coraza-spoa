@@ -41,6 +41,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		switch arg.Name {
 		case "id":
 			tx = s.waf.NewTransaction()
+			defer tx.ProcessLogging()
 			tx.ID, ok = arg.Value.(string)
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
