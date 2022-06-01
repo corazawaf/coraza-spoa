@@ -45,8 +45,20 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
-
 			tx.GetCollection(variables.UniqueID).Set("", []string{tx.ID})
+			defer func() {
+				if tx.Interrupted() {
+					tx.ProcessLogging()
+					if err := tx.Clean(); err != nil {
+						logger.Error("failed to clean transaction", logger.String("transaction_id", tx.ID), logger.String("error", err.Error()))
+					}
+				} else {
+					err := s.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(s.cfg.TransactionTTL))
+					if err != nil {
+						logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
+					}
+				}
+			}()
 		case "src-ip":
 			value, ok := arg.Value.(net.IP)
 			if !ok {
@@ -119,11 +131,6 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 	}
 	if it != nil {
 		return s.message(Hit), nil
-	}
-
-	err = s.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(s.cfg.TransactionTTL))
-	if err != nil {
-		logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
 	}
 	return s.message(Miss), nil
 }
