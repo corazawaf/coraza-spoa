@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+# add unprivileged user & group for the coraza-spoa
+addgroup --quiet --system coraza-spoa || true
+
+adduser --quiet --system --ingroup coraza-spoa --no-create-home --home /nonexistent --disabled-password coraza-spoa || true
+
+if [ ! -d /var/log/coraza-spoa ]; then
+  mkdir -p /var/log/coraza-spoa /var/log/coraza-spoa/audit
+  touch /var/log/coraza-spoa/server.log /var/log/coraza-spoa/error.log \
+        /var/log/coraza-spoa/audit.log /var/log/coraza-spoa/debug.log
+fi
+
+chown -R coraza-spoa:adm /var/log/coraza-spoa 2> /dev/null || true
+chmod 755 /var/log/coraza-spoa 2> /dev/null || true
