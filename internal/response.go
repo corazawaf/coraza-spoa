@@ -16,6 +16,7 @@ package internal
 
 import (
 	"fmt"
+
 	"github.com/corazawaf/coraza-spoa/pkg/logger"
 	"github.com/corazawaf/coraza/v2"
 	"github.com/corazawaf/coraza/v2/types/variables"
@@ -38,6 +39,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 		tx      = new(coraza.Transaction)
 	)
 	defer func() {
+		// This will also force the transaction to be closed
 		s.cache.Remove(id)
 	}()
 

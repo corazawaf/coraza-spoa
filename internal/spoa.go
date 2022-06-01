@@ -16,14 +16,16 @@ package internal
 
 import (
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/bluele/gcache"
 	"github.com/corazawaf/coraza-spoa/config"
 	"github.com/corazawaf/coraza-spoa/pkg/logger"
 	"github.com/corazawaf/coraza/v2"
 	"github.com/corazawaf/coraza/v2/seclang"
 	spoe "github.com/criteo/haproxy-spoe-go"
-	"net/http"
-	"strings"
+	"go.uber.org/zap"
 )
 
 const (
@@ -111,6 +113,18 @@ func New(cfg *config.SPOA) (*SPOA, error) {
 		}
 	}
 
-	s.cache = gcache.New(s.cfg.TransactionActiveLimit).ARC().Build()
+	s.cache = gcache.New(s.cfg.TransactionActiveLimit).
+		EvictedFunc(func(key, value interface{}) {
+			// everytime a transaction is timedout we clean it
+			tx, ok := value.(*coraza.Transaction)
+			if !ok {
+				return
+			}
+			// Process Logging won't do anything if TX was already logged.
+			tx.ProcessLogging()
+			if err := tx.Clean(); err != nil {
+				logger.Error("Failed to clean cache", zap.Error(err))
+			}
+		}).ARC().Build()
 	return s, nil
 }
