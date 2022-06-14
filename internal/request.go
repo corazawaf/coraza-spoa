@@ -32,6 +32,10 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		path    = "/"
 		query   = ""
 		version = "1.1"
+		srcIP   net.IP
+		srcPort = 0
+		dstIP   net.IP
+		dstPort = 0
 		tx      = new(coraza.Transaction)
 	)
 
@@ -60,12 +64,25 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				}
 			}()
 		case "src-ip":
-			value, ok := arg.Value.(net.IP)
+			srcIP, ok = arg.Value.(net.IP)
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for src ip, net.IP expected, got %v", arg.Value)
 			}
-
-			tx.ProcessConnection(value.String(), 0, "", 0)
+		case "src-port":
+			srcPort, ok = arg.Value.(int)
+			if !ok {
+				return nil, fmt.Errorf("invalid argument for src port, integer expected, got %v", arg.Value)
+			}
+		case "dst-ip":
+			dstIP, ok = arg.Value.(net.IP)
+			if !ok {
+				return nil, fmt.Errorf("invalid argument for dst ip, net.IP expected, got %v", arg.Value)
+			}
+		case "dst-port":
+			dstPort, ok = arg.Value.(int)
+			if !ok {
+				return nil, fmt.Errorf("invalid argument for dst port, integer expected, got %v", arg.Value)
+			}
 		case "method":
 			method, ok = arg.Value.(string)
 			if !ok {
@@ -121,7 +138,12 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		}
 	}
 
+	logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
+	tx.ProcessConnection(srcIP.String(), srcPort, dstIP.String(), dstPort)
+
+	logger.Debug(fmt.Sprintf("ProcessURI: %s?%s %s %s", path, query, method, "HTTP/"+version))
 	tx.ProcessURI(path+"?"+query, method, "HTTP/"+version)
+
 	if it := tx.ProcessRequestHeaders(); it != nil {
 		return s.message(Hit), nil
 	}
