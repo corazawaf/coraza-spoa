@@ -12,28 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.DEFAULT_GOAL := build
+BINARY = coraza-spoa
 
-HOST_ARCH = $(shell which go >/dev/null 2>&1 && go env GOARCH)
-ARCH ?= $(HOST_ARCH)
+VERSION ?= "dev"
+REVISION ?= $(shell git rev-parse HEAD)
+
+ARCH ?= $(shell which go >/dev/null 2>&1 && go env GOARCH)
+
 ifeq ($(ARCH),)
 	$(error mandatory variable ARCH is empty, either set it when calling the command or make sure 'go env GOARCH' works)
 endif
 
-HOST_OS = $(shell which go >/dev/null 2>&1 && go env GOOS)
-OS ?= $(HOST_OS)
+OS ?= $(shell which go >/dev/null 2>&1 && go env GOOS)
+
 ifeq ($(OS),)
 	$(error mandatory variable OS is empty, either set it when calling the cammand or make sure 'go env GOOS' works)
 endif
 
-EXECUTABLE_FILE = coraza-spoa
+#LDFLAGS = -ldflags "-X main.Version=${VERSION} -X main.Revision=${REVISION}"
 
-.PHONY: build
+
+default: build
+
 build:
-	@GOARCH=$(ARCH) go build -o $(EXECUTABLE_FILE) cmd/main.go
+	GOARCH=$(ARCH) GOOS=$(OS) go build -v ${LDFLAGS} -o $(BINARY)_$(ARCH) cmd/main.go
 
-.PHONY: clean
-clean: $(BUILD_FILES)
-	@rm -rf $(EXECUTABLE_FILE)
-
-
+clean:
+	rm -f $(BINARY)_amd64 $(BINARY)_arm64 $(BINARY)_386
