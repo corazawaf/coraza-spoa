@@ -70,7 +70,7 @@ jobs:
            ./coraza.conf=/etc/coraza-spoa/coraza.conf
 
       ## Publish to the "testing" repo
-      - name: Cloudsmith Push: debian/coraza-spoa-snapshots
+      - name: Cloudsmith Push:debian/coraza-spoa-snapshots
         if: ${{ github.ref_type == 'branch' }}
         uses: cloudsmith-io/action@master
         with:
@@ -84,7 +84,7 @@ jobs:
           file: "coraza-spoa_${PACKAGE_VERSION}_${{matrix.arch}}.deb" # debian package filename
 
       ## Publish tags to the "main" repo
-      - name: Cloudsmith Push: debian/coraza-spoa
+      - name: Cloudsmith Push:debian/coraza-spoa
         if: ${{ github.ref_type == 'tag' }}
         uses: cloudsmith-io/action@master
         with:
