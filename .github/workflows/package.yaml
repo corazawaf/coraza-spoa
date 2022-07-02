@@ -77,7 +77,7 @@ jobs:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
           format: "deb"
-          owner: "coraza"               # Your Cloudsmith account name or org name (namespace)
+          owner: "corazawaf"            # Your Cloudsmith account name or org name (namespace)
           repo: "coraza-spoa-snapshots" # Your Cloudsmith Repository name (slug)
           distro: "any-distro"          # Your Distribution  (i.e Debian, Ubuntu)
           release: "any-version"        # Your Distribution Release (i.e xenial, buster)
@@ -91,7 +91,7 @@ jobs:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
           format: "deb"
-          owner: "coraza"            # Your Cloudsmith account name or org name (namespace)
+          owner: "corazawaf"         # Your Cloudsmith account name or org name (namespace)
           repo: "coraza-spoa"        # Your Cloudsmith Repository name (slug)
           distro: "any-distro"       # Your Distribution  (i.e Debian, Ubuntu)
           release: "any-version"     # Your Distribution Release (i.e xenial, buster)
