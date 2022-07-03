@@ -74,3 +74,10 @@ http-response deny if { var(txn.coraza.fail) -m int eq 1 }
 ```
 With this rule, all unsafe requests will be rejected. You can find the example HAProxy configuration file in the [doc/config/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/haproxy.cfg).
 
+
+
+## Docker
+
+- Build the coraza-spoa image `docker-compose build`
+- Run haproxy, coraza-spoa and a mock server `docker-compose up`
+- Perform a request which gets blocked by the WAF: `curl http://localhost:4000/\?x\=/etc/passwd`
