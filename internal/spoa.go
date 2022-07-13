@@ -26,6 +26,9 @@ import (
 	"github.com/corazawaf/coraza/v2/seclang"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
+
+	_ "github.com/jptosso/coraza-libinjection"
+	_ "github.com/jptosso/coraza-pcre"
 )
 
 const (
