@@ -16,7 +16,10 @@ package internal
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/bluele/gcache"
@@ -102,6 +105,21 @@ func New(cfg *config.SPOA) (*SPOA, error) {
 	s.cfg = cfg
 
 	s.waf = coraza.NewWaf()
+	f := config.C.ConfigFile
+	var writer io.Writer
+	if f != "" {
+		f, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+		if err != nil {
+			log.Fatalf("error opening file: %v", err)
+		}
+		writer = io.MultiWriter(os.Stdout, f)
+	} else {
+		writer = os.Stdout
+	}
+	l := log.New(writer, "coraza", log.LstdFlags|log.Lshortfile)
+	s.waf.SetErrorLogCb(func(err coraza.MatchedRule) {
+		l.Println(err.ErrorLog(0))
+	})
 	parser, _ := seclang.NewParser(s.waf)
 	if len(s.cfg.Include) == 0 {
 		logger.Warn("No include path or file specified")
