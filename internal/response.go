@@ -16,7 +16,6 @@ package internal
 
 import (
 	"fmt"
-
 	"github.com/corazawaf/coraza-spoa/pkg/logger"
 	"github.com/corazawaf/coraza/v2"
 	"github.com/corazawaf/coraza/v2/types/variables"

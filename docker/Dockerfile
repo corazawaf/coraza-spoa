@@ -38,9 +38,6 @@ RUN set -eux; \
     && rm /tmp/coreruleset.tar.gz \
     && cp /tmp/coraza-coreruleset/crs-setup.conf.example /etc/coraza-spoa/crs-setup.conf \
     && cp /tmp/coraza-coreruleset/rules/* /etc/coraza-spoa/rules/ \
-    && rm -rf /tmp/coraza-coreruleset \
-    && mkdir -p /var/log/coraza-spoa \
-    && touch /var/log/coraza-spoa/error.log \
-    && ln -sf /proc/1/fd/1 /var/log/coraza-spoa/error.log
+    && rm -rf /tmp/coraza-coreruleset
 
 ENTRYPOINT ["tini", "--", "/start.sh"]

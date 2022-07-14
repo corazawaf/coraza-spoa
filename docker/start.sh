@@ -28,4 +28,4 @@ fi
 
 echo "Using config file: $conf"
 
-exec ./coraza-spoa -config-file $conf
+exec ./coraza-spoa -config-file $conf -std-out

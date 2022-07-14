@@ -17,9 +17,11 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/corazawaf/coraza-spoa/pkg/logger"
-	"gopkg.in/yaml.v3"
 	"os"
+
+	"gopkg.in/yaml.v3"
+
+	"github.com/corazawaf/coraza-spoa/pkg/logger"
 )
 
 // C is used to store the configuration.
@@ -27,6 +29,7 @@ var C Config
 
 func init() {
 	flag.StringVar(&C.ConfigFile, "config-file", "./config.yml", "The configuration file of the coraza-spoa.")
+	flag.BoolVar(&C.EnableStdOut, "std-out", false, "Enable stdout logging.")
 }
 
 // Config is used to configure coraza-server.
@@ -35,7 +38,8 @@ type Config struct {
 	SPOA SPOA `yaml:"spoa"`
 
 	// ConfigFile is the configuration file of the coraza-server.
-	ConfigFile string
+	ConfigFile   string
+	EnableStdOut bool
 }
 
 // Log is used to configure the level and dir of the log.
@@ -72,7 +76,9 @@ func InitConfig() error {
 	}
 
 	// set the log configuration
-	initLog()
+	if !C.EnableStdOut {
+		initLog()
+	}
 
 	return nil
 }

@@ -19,10 +19,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/corazawaf/coraza-spoa/pkg/logger"
 	"github.com/corazawaf/coraza/v2"
 	"github.com/corazawaf/coraza/v2/types/variables"
 	spoe "github.com/criteo/haproxy-spoe-go"
+
+	"github.com/corazawaf/coraza-spoa/pkg/logger"
 )
 
 func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
@@ -50,19 +51,6 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
 			tx.GetCollection(variables.UniqueID).Set("", []string{tx.ID})
-			defer func() {
-				if tx.Interrupted() {
-					tx.ProcessLogging()
-					if err := tx.Clean(); err != nil {
-						logger.Error("failed to clean transaction", logger.String("transaction_id", tx.ID), logger.String("error", err.Error()))
-					}
-				} else {
-					err := s.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(s.cfg.TransactionTTL))
-					if err != nil {
-						logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
-					}
-				}
-			}()
 		case "src-ip":
 			srcIP, ok = arg.Value.(net.IP)
 			if !ok {
@@ -138,6 +126,21 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		}
 	}
 
+	defer func() {
+		if tx.Interrupted() {
+			//tx.AuditEngine = types.AuditEngineOn
+			tx.ProcessLogging()
+			if err := tx.Clean(); err != nil {
+				logger.Error("failed to clean transaction", logger.String("transaction_id", tx.ID), logger.String("error", err.Error()))
+			}
+		} else {
+			err := s.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(s.cfg.TransactionTTL))
+			if err != nil {
+				logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
+			}
+		}
+	}()
+
 	logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
 	tx.ProcessConnection(srcIP.String(), srcPort, dstIP.String(), dstPort)
 
@@ -152,6 +155,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		return nil, err
 	}
 	if it != nil {
+		logger.Info(fmt.Sprintf("Request hit occured due to rule ID %d from source IP %s", it.RuleID, srcIP.String()))
 		return s.message(Hit), nil
 	}
 	return s.message(Miss), nil

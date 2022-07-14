@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      target: production
     hostname: coraza
     container_name: coraza
     restart: unless-stopped

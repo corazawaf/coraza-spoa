@@ -15,7 +15,39 @@ spoa:
   include:
     - /etc/coraza-spoa/coraza.conf
     - /etc/coraza-spoa/crs-setup.conf
-    - /etc/coraza-spoa/rules/*.conf
+#    - /etc/coraza-spoa/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf
+    - /etc/coraza-spoa/rules/REQUEST-901-INITIALIZATION.conf
+    - /etc/coraza-spoa/rules/REQUEST-903.9001-DRUPAL-EXCLUSION-RULES.conf
+    - /etc/coraza-spoa/rules/REQUEST-903.9002-WORDPRESS-EXCLUSION-RULES.conf
+    - /etc/coraza-spoa/rules/REQUEST-903.9003-NEXTCLOUD-EXCLUSION-RULES.conf
+    - /etc/coraza-spoa/rules/REQUEST-903.9004-DOKUWIKI-EXCLUSION-RULES.conf
+    - /etc/coraza-spoa/rules/REQUEST-903.9005-CPANEL-EXCLUSION-RULES.conf
+    - /etc/coraza-spoa/rules/REQUEST-903.9006-XENFORO-EXCLUSION-RULES.conf
+    - /etc/coraza-spoa/rules/REQUEST-905-COMMON-EXCEPTIONS.conf
+    - /etc/coraza-spoa/rules/REQUEST-910-IP-REPUTATION.conf
+    - /etc/coraza-spoa/rules/REQUEST-911-METHOD-ENFORCEMENT.conf
+    - /etc/coraza-spoa/rules/REQUEST-912-DOS-PROTECTION.conf
+    - /etc/coraza-spoa/rules/REQUEST-913-SCANNER-DETECTION.conf
+    - /etc/coraza-spoa/rules/REQUEST-920-PROTOCOL-ENFORCEMENT.conf
+    - /etc/coraza-spoa/rules/REQUEST-921-PROTOCOL-ATTACK.conf
+    - /etc/coraza-spoa/rules/REQUEST-930-APPLICATION-ATTACK-LFI.conf
+    - /etc/coraza-spoa/rules/REQUEST-931-APPLICATION-ATTACK-RFI.conf
+    - /etc/coraza-spoa/rules/REQUEST-932-APPLICATION-ATTACK-RCE.conf
+    - /etc/coraza-spoa/rules/REQUEST-933-APPLICATION-ATTACK-PHP.conf
+    - /etc/coraza-spoa/rules/REQUEST-934-APPLICATION-ATTACK-NODEJS.conf
+    - /etc/coraza-spoa/rules/REQUEST-941-APPLICATION-ATTACK-XSS.conf
+    - /etc/coraza-spoa/rules/REQUEST-942-APPLICATION-ATTACK-SQLI.conf
+    - /etc/coraza-spoa/rules/REQUEST-943-APPLICATION-ATTACK-SESSION-FIXATION.conf
+    - /etc/coraza-spoa/rules/REQUEST-944-APPLICATION-ATTACK-JAVA.conf
+    - /etc/coraza-spoa/rules/REQUEST-949-BLOCKING-EVALUATION.conf
+    - /etc/coraza-spoa/rules/RESPONSE-950-DATA-LEAKAGES.conf
+    - /etc/coraza-spoa/rules/RESPONSE-951-DATA-LEAKAGES-SQL.conf
+    - /etc/coraza-spoa/rules/RESPONSE-952-DATA-LEAKAGES-JAVA.conf
+    - /etc/coraza-spoa/rules/RESPONSE-953-DATA-LEAKAGES-PHP.conf
+    - /etc/coraza-spoa/rules/RESPONSE-954-DATA-LEAKAGES-IIS.conf
+    - /etc/coraza-spoa/rules/RESPONSE-959-BLOCKING-EVALUATION.conf
+    - /etc/coraza-spoa/rules/RESPONSE-980-CORRELATION.conf
+#    - /etc/coraza-spoa/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf
 
   # The transaction cache lifetime(ms)
   transaction_ttl: 60000
