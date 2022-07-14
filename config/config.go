@@ -17,9 +17,10 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/corazawaf/coraza-spoa/pkg/logger"
 	"gopkg.in/yaml.v3"
-	"os"
 )
 
 // C is used to store the configuration.
@@ -31,8 +32,9 @@ func init() {
 
 // Config is used to configure coraza-server.
 type Config struct {
-	Log  Log  `yaml:"log"`
-	SPOA SPOA `yaml:"spoa"`
+	ErrorLog string `yaml:"error_log"`
+	Log      Log    `yaml:"log"`
+	SPOA     SPOA   `yaml:"spoa"`
 
 	// ConfigFile is the configuration file of the coraza-server.
 	ConfigFile string
