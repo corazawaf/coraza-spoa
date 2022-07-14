@@ -12,7 +12,7 @@ services:
       - coraza
 
   haproxy:
-    image: haproxy:2.5.7-bullseye
+    image: haproxy:2.4.17-alpine
     hostname: haproxy
     container_name: haproxy
     restart: unless-stopped
