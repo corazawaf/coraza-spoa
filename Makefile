@@ -32,7 +32,7 @@ endif
 #LDFLAGS = -ldflags "-X main.Version=${VERSION} -X main.Revision=${REVISION}"
 
 
-default: build
+default: docker
 
 build:
 	GOARCH=$(ARCH) GOOS=$(OS) go build -v ${LDFLAGS} -o $(BINARY)_$(ARCH) cmd/main.go

@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  coraza:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    hostname: coraza
+    container_name: coraza
+    restart: unless-stopped
+    networks:
+      - coraza
+
+  haproxy:
+    image: haproxy:2.5.7-bullseye
+    hostname: haproxy
+    container_name: haproxy
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8936:1936"
+    volumes:
+      - "./docker/haproxy:/usr/local/etc/haproxy"
+    networks:
+      - coraza
+
+  echo:
+    image: gcr.io/google_containers/echoserver:1.3
+    hostname: echo
+    container_name: echo
+    restart: unless-stopped
+    networks:
+      - coraza
+
+networks:
+  coraza:

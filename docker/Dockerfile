@@ -20,8 +20,8 @@ FROM alpine:3.16 AS production
 ARG CORERULESET_VERSION=v3.3.2
 ARG CORERULESET_MD5=244db30b807c56d8277010b70305efda
 
-COPY ./build/coraza.conf /etc/coraza-spoa/coraza.conf
-COPY ./build/start.sh ./build/config.yml ./
+COPY ./docker/conf/coraza.conf /etc/coraza-spoa/coraza.conf
+COPY ./docker/start.sh ./docker/conf/config.yml ./
 COPY --from=builder /app/coraza-spoa ./coraza-spoa
 
 RUN set -eux; \
