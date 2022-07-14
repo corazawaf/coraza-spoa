@@ -15,7 +15,7 @@ spoa:
   include:
     - /etc/coraza-spoa/coraza.conf
     - /etc/coraza-spoa/crs-setup.conf
-#    - /etc/coraza-spoa/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf
+    - /etc/coraza-spoa/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf
     - /etc/coraza-spoa/rules/REQUEST-901-INITIALIZATION.conf
     - /etc/coraza-spoa/rules/REQUEST-903.9001-DRUPAL-EXCLUSION-RULES.conf
     - /etc/coraza-spoa/rules/REQUEST-903.9002-WORDPRESS-EXCLUSION-RULES.conf
@@ -47,7 +47,7 @@ spoa:
     - /etc/coraza-spoa/rules/RESPONSE-954-DATA-LEAKAGES-IIS.conf
     - /etc/coraza-spoa/rules/RESPONSE-959-BLOCKING-EVALUATION.conf
     - /etc/coraza-spoa/rules/RESPONSE-980-CORRELATION.conf
-#    - /etc/coraza-spoa/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf
+    - /etc/coraza-spoa/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf
 
   # The transaction cache lifetime(ms)
   transaction_ttl: 60000

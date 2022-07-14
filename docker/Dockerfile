@@ -38,6 +38,8 @@ RUN set -eux; \
     && rm /tmp/coreruleset.tar.gz \
     && cp /tmp/coraza-coreruleset/crs-setup.conf.example /etc/coraza-spoa/crs-setup.conf \
     && cp /tmp/coraza-coreruleset/rules/* /etc/coraza-spoa/rules/ \
-    && rm -rf /tmp/coraza-coreruleset
+    && rm -rf /tmp/coraza-coreruleset \
+    && find /etc/coraza-spoa/rules -type f -name '*.example' | while read -r f; do cp -p "$f" "${f%.example}"; done \
+    && sed -i.example 's/^\(SecDefaultAction "phase:[12]\),log,auditlog,pass"/\1,log,noauditlog,deny,status:403"/' /etc/coraza-spoa/crs-setup.conf
 
 ENTRYPOINT ["tini", "--", "/start.sh"]
