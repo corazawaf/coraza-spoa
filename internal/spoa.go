@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/bluele/gcache"
 	"github.com/corazawaf/coraza-spoa/config"
@@ -143,6 +144,6 @@ func New(cfg *config.SPOA) (*SPOA, error) {
 			if err := tx.Clean(); err != nil {
 				logger.Error("Failed to clean cache", zap.Error(err))
 			}
-		}).ARC().Build()
+		}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()
 	return s, nil
 }
