@@ -106,7 +106,7 @@ func New(cfg *config.SPOA) (*SPOA, error) {
 	s.cfg = cfg
 
 	s.waf = coraza.NewWaf()
-	f := config.C.ConfigFile
+	f := config.C.ErrorLog
 	var writer io.Writer
 	if f != "" {
 		f, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
