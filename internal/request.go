@@ -15,14 +15,14 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
 
-	"github.com/corazawaf/coraza-spoa/pkg/logger"
-	"github.com/corazawaf/coraza/v2"
-	"github.com/corazawaf/coraza/v2/types/variables"
+	"github.com/corazawaf/coraza/v3"
 	spoe "github.com/criteo/haproxy-spoe-go"
+	"go.uber.org/zap"
 )
 
 func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
@@ -38,28 +38,37 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		dstPort = 0
 		tx      = new(coraza.Transaction)
 	)
-
+	var app *application
 	for msg.Args.Next() {
 		arg := msg.Args.Arg
+		if arg.Name != "app" && app == nil {
+			return nil, fmt.Errorf("app is not set")
+		}
 
 		switch arg.Name {
+		case "app":
+			var ok bool
+			app, ok = s.applications[arg.Value.(string)]
+			if !ok {
+				return nil, fmt.Errorf("application %q not found", arg.Value.(string))
+			}
 		case "id":
-			tx = s.waf.NewTransaction()
+			tx = app.waf.NewTransaction(context.Background())
 			tx.ID, ok = arg.Value.(string)
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
-			tx.GetCollection(variables.UniqueID).Set("", []string{tx.ID})
+			tx.Variables.UniqueID.Set(tx.ID)
 			defer func() {
 				if tx.Interrupted() {
 					tx.ProcessLogging()
 					if err := tx.Clean(); err != nil {
-						logger.Error("failed to clean transaction", logger.String("transaction_id", tx.ID), logger.String("error", err.Error()))
+						app.logger.Error("failed to clean transaction", zap.String("transaction_id", tx.ID), zap.String("error", err.Error()))
 					}
 				} else {
-					err := s.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(s.cfg.TransactionTTL))
+					err := app.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(app.cfg.TransactionTTL))
 					if err != nil {
-						logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
+						app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
 					}
 				}
 			}()
@@ -91,25 +100,25 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		case "path":
 			path, ok = arg.Value.(string)
 			if !ok {
-				logger.Error(fmt.Sprintf("invalid argument for http request path, string expected, got %v", arg.Value))
+				app.logger.Error(fmt.Sprintf("invalid argument for http request path, string expected, got %v", arg.Value))
 				path = "/"
 			}
 		case "query":
 			query, ok = arg.Value.(string)
 			if !ok && arg.Value != nil {
-				logger.Error(fmt.Sprintf("invalid argument for http request query, string expected, got %v", arg.Value))
+				app.logger.Error(fmt.Sprintf("invalid argument for http request query, string expected, got %v", arg.Value))
 				query = ""
 			}
 		case "version":
 			version, ok = arg.Value.(string)
 			if !ok {
-				logger.Error(fmt.Sprintf("invalid argument for http request version, string expected, got %v", arg.Value))
+				app.logger.Error(fmt.Sprintf("invalid argument for http request version, string expected, got %v", arg.Value))
 				version = "1.1"
 			}
 		case "headers":
 			value, ok := arg.Value.(string)
 			if !ok {
-				logger.Error(fmt.Sprintf("invalid argument for http request headers, string expected, got %v", arg.Value))
+				app.logger.Error(fmt.Sprintf("invalid argument for http request headers, string expected, got %v", arg.Value))
 				value = ""
 			}
 
@@ -134,14 +143,14 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, err
 			}
 		default:
-			logger.Warn(fmt.Sprintf("invalid message on the http frontend request, name: %s, value: %s", arg.Name, arg.Value))
+			app.logger.Error("invalid message on the http frontend request", zap.String("name", arg.Name), zap.Any("value", arg.Value))
 		}
 	}
 
-	logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
+	// logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
 	tx.ProcessConnection(srcIP.String(), srcPort, dstIP.String(), dstPort)
 
-	logger.Debug(fmt.Sprintf("ProcessURI: %s?%s %s %s", path, query, method, "HTTP/"+version))
+	// logger.Debug(fmt.Sprintf("ProcessURI: %s?%s %s %s", path, query, method, "HTTP/"+version))
 	tx.ProcessURI(path+"?"+query, method, "HTTP/"+version)
 
 	if it := tx.ProcessRequestHeaders(); it != nil {

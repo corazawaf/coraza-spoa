@@ -19,27 +19,22 @@ import (
 
 	"github.com/corazawaf/coraza-spoa/config"
 	"github.com/corazawaf/coraza-spoa/internal"
-	"github.com/corazawaf/coraza-spoa/pkg/logger"
 )
 
 func main() {
-	defer func() {
-		if err := logger.Sync(); err != nil {
-			_ = err
-		}
-	}()
-
+	cfg := flag.String("config", "", "configuration file")
+	if cfg == nil {
+		panic("configuration file is not set")
+	}
 	flag.Parse()
-	if err := config.InitConfig(); err != nil {
+	if err := config.InitConfig(*cfg); err != nil {
 		panic(err)
 	}
-
-	spoa, err := internal.New(&config.C.SPOA)
+	spoa, err := internal.New(config.Global.Applications)
 	if err != nil {
-		logger.Fatal(err.Error())
+		panic(err)
 	}
-
-	if err = spoa.Start(); err != nil {
-		logger.Fatal(err.Error())
+	if err := spoa.Start(config.Global.Bind); err != nil {
+		panic(err)
 	}
 }

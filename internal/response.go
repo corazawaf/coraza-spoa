@@ -17,57 +17,56 @@ package internal
 import (
 	"fmt"
 
-	"github.com/corazawaf/coraza-spoa/pkg/logger"
-	"github.com/corazawaf/coraza/v2"
-	"github.com/corazawaf/coraza/v2/types/variables"
+	"github.com/corazawaf/coraza/v3"
 	spoe "github.com/criteo/haproxy-spoe-go"
+	"go.uber.org/zap"
 )
-
-func (s *SPOA) resetTX(id string) *coraza.Transaction {
-	tx := s.waf.NewTransaction()
-	tx.ID = id
-	tx.GetCollection(variables.UniqueID).Set("", []string{tx.ID})
-	return tx
-}
 
 func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 	var (
 		ok      bool
+		app     *application
 		id      = ""
 		status  = 0
 		version = ""
 		tx      = new(coraza.Transaction)
 	)
 	defer func() {
-		// This will also force the transaction to be closed
-		s.cache.Remove(id)
+		app.cache.Remove(id)
 	}()
 
 	for msg.Args.Next() {
 		arg := msg.Args.Arg
-
+		if arg.Name != "app" && app == nil {
+			return nil, fmt.Errorf("app is not set")
+		}
 		switch arg.Name {
+		case "app":
+			var ok bool
+			app, ok = s.applications[arg.Value.(string)]
+			if !ok {
+				return nil, fmt.Errorf("application %q not found", arg.Value.(string))
+			}
 		case "id":
 			id, ok := arg.Value.(string)
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http response id, string expected, got %v", arg.Value)
 			}
 
-			txInterface, err := s.cache.Get(id)
+			txInterface, err := app.cache.Get(id)
 			if err != nil {
-				logger.Error("failed to get transaction from cache", logger.String("transaction_id", id), logger.String("error", err.Error()))
-				tx = s.resetTX(id)
+				app.logger.Error("failed to get transaction from cache", zap.String("transaction_id", id), zap.String("error", err.Error()), zap.String("app", app.name))
 				break
 			}
 
 			if tx, ok = txInterface.(*coraza.Transaction); ok {
-				break
+				app.logger.Error("Application cache is corrupted", zap.String("transaction_id", id), zap.String("app", app.name))
+				return nil, fmt.Errorf("application cache is corrupted")
 			}
-			tx = s.resetTX(id)
 		case "version":
 			version, ok = arg.Value.(string)
 			if !ok {
-				logger.Error(fmt.Sprintf("invalid argument for http response version, string expected, got %v", arg.Value))
+				app.logger.Error(fmt.Sprintf("invalid argument for http response version, string expected, got %v", arg.Value))
 				version = "1.1"
 			}
 		case "status":
@@ -78,7 +77,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 		case "headers":
 			value, ok := arg.Value.(string)
 			if !ok {
-				logger.Error(fmt.Sprintf("invalid argument for http response headers, string expected, got %v", arg.Value))
+				app.logger.Error(fmt.Sprintf("invalid argument for http response headers, string expected, got %v", arg.Value))
 				value = ""
 			}
 			headers, err := s.readHeaders(value)
@@ -100,7 +99,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, err
 			}
 		default:
-			logger.Warn(fmt.Sprintf("invalid message on the http response, name: %s, value: %s", arg.Name, arg.Value))
+			app.logger.Warn(fmt.Sprintf("invalid message on the http response, name: %s, value: %s", arg.Name, arg.Value))
 		}
 	}
 
