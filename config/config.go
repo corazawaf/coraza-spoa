@@ -62,6 +62,7 @@ func InitConfig(file string) error {
 }
 
 func validateConfig() error {
+	fmt.Printf("Loading %d applications\n", len(Global.Applications))
 	for _, app := range Global.Applications {
 		if app.LogLevel == "" {
 			app.LogLevel = "warn"

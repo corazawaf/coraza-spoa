@@ -154,14 +154,14 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 	tx.ProcessURI(path+"?"+query, method, "HTTP/"+version)
 
 	if it := tx.ProcessRequestHeaders(); it != nil {
-		return s.message(Hit), nil
+		return s.message(hit), nil
 	}
 	it, err := tx.ProcessRequestBody()
 	if err != nil {
 		return nil, err
 	}
 	if it != nil {
-		return s.message(Hit), nil
+		return s.message(hit), nil
 	}
-	return s.message(Miss), nil
+	return s.message(miss), nil
 }

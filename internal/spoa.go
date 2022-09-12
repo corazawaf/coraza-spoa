@@ -32,10 +32,10 @@ import (
 )
 
 const (
-	// Miss sets the detection result to safe.
-	Miss = iota
-	// Hit opposite to Miss.
-	Hit
+	// miss sets the detection result to safe.
+	miss = iota
+	// hit opposite to Miss.
+	hit
 )
 
 type application struct {
