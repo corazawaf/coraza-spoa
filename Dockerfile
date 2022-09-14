@@ -21,6 +21,10 @@ RUN \
     && mv /tmp/coraza-coreruleset/rules /etc/coraza-spoa \
     && rm -rf /tmp/*
 
+# Cache Go dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
 # Copy project files into build image
 COPY . .
 
