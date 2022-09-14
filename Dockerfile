@@ -7,16 +7,10 @@ ARG CORERULESET_MD5=9140236dc7e941c274e414385824c996
 # Change working directory
 WORKDIR /app
 
-RUN set -eux; \
-    # Install build packages
+RUN \
     apk add --no-cache \
-        gc-dev \
+        # Install make to build coraza-spoa binary from makefile
         make \
-        gcc \
-        git \
-        musl-dev \
-        pcre-dev \
-        wget \
     # Download and set up Coreruleset
     && wget -qO/tmp/coreruleset.tar.gz https://github.com/coreruleset/coreruleset/archive/${CORERULESET_VERSION}.tar.gz \
     && echo "$CORERULESET_MD5  /tmp/coreruleset.tar.gz" | md5sum -c \
