@@ -13,15 +13,15 @@ The command `make` will compile the source code and produce the executable file 
 When you need to re-compile the source code, you can use the command `make clean` to clean the executable file.
 
 ## Configuration file
-The example configuration file is `config.yml.default`, you can copy it and modify the related configuration information.
+The example configuration file is `config.yaml.default`, you can copy it and modify the related configuration information.
 
 ## Start the service
 After you have compiled it, you can start the service by running the command `./coraza-spoa`.
 ```shell
 $> ./coraza-spoa -h
 Usage of ./coraza-spoa:
-  -config-file string
-        The configuration file of the coraza-spoa. (default "./config.yml")
+  -config string
+        configuration file
 ```
 
 ## Configure a SPOE to use the service
@@ -38,11 +38,11 @@ spoe-agent coraza-agent
     log global
 
 spoe-message coraza-req
-    args app=sample_app id=unique-id src-ip=src method=method path=path query=query version=req.ver headers=req.hdrs bodyreq.body
+    args app=str(sample_app) id=unique-id src-ip=src method=method path=path query=query version=req.ver headers=req.hdrs bodyreq.body
     event on-frontend-http-request
 
 spoe-message coraza-res
-    args app=sample_app id=unique-id version=res.ver status=status headers=res.hdrs body=res.body
+    args app=str(sample_app) id=unique-id version=res.ver status=status headers=res.hdrs body=res.body
     event on-http-response
 ```
 
