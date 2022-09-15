@@ -19,6 +19,7 @@ RUN \
     && tar xzf /tmp/coreruleset.tar.gz --strip-components=1 -C /tmp/coraza-coreruleset \
     && mv /tmp/coraza-coreruleset/crs-setup.conf.example /etc/coraza-spoa/crs-setup.conf \
     && mv /tmp/coraza-coreruleset/rules /etc/coraza-spoa \
+    && mv /tmp/coraza-coreruleset/plugins /etc/coraza-spoa \
     && rm -rf /tmp/*
 
 # Cache Go dependencies
@@ -32,10 +33,8 @@ COPY . .
 RUN make
 
 RUN \
-    # Move Coreruleset "plugins" directory next to "rules" directory
-    mv /app/docker/coraza-spoa/plugins /etc/coraza-spoa/plugins \
     # Move coraza-spoa config file to config dir
-    && mv /app/docker/coraza-spoa/coraza.conf /etc/coraza-spoa/coraza.conf \
+    mv /app/docker/coraza-spoa/coraza.conf /etc/coraza-spoa/coraza.conf \
     # Rename coraza-spoa default config file
     && mv /app/config.yaml.default /app/config.yaml \
     # Rename coraza-spoa binary
