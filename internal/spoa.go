@@ -173,6 +173,8 @@ func New(conf map[string]*config.Application) (*SPOA, error) {
 					app.logger.Error("Failed to clean cache", zap.Error(err))
 				}
 			}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()
+
+		apps[name] = app
 	}
 	return &SPOA{
 		applications: apps,

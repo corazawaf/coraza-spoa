@@ -2,10 +2,6 @@ version: "3.9"
 services:
   coraza:
     build: .
-    volumes:
-      - type: bind
-        source: ./docker/coraza-spoa
-        target: /etc/coraza-spoa
   haproxy:
     image: haproxy:2.5.7-bullseye
     ports: [ "4000:80", "4443:443", "4001:4001" ]

@@ -59,7 +59,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 				break
 			}
 
-			if tx, ok = txInterface.(*coraza.Transaction); ok {
+			if tx, ok = txInterface.(*coraza.Transaction); !ok {
 				app.logger.Error("Application cache is corrupted", zap.String("transaction_id", id), zap.String("app", app.name))
 				return nil, fmt.Errorf("application cache is corrupted")
 			}
