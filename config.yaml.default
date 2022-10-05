@@ -2,7 +2,9 @@
 # The SPOA server bind address
 bind: 0.0.0.0:9000
 
-# Process with this application if request's provided app is not found
+# Process request with specified application if provided app is not found.
+# You can comment out "default_application" configuration parameter
+# if you don't need this functionality.
 default_application: sample_app
 
 applications:
