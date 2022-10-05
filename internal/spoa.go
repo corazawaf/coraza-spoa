@@ -48,8 +48,8 @@ type application struct {
 
 // SPOA store the relevant data for starting SPOA.
 type SPOA struct {
-	applications        map[string]*application
-	default_application string
+	applications       map[string]*application
+	defaultApplication string
 }
 
 // Start starts the SPOA to detect the security risks.
@@ -178,7 +178,7 @@ func New(conf *config.Config) (*SPOA, error) {
 		apps[name] = app
 	}
 	return &SPOA{
-		applications:        apps,
-		default_application: conf.DefaultApplication,
+		applications:       apps,
+		defaultApplication: conf.DefaultApplication,
 	}, nil
 }
