@@ -50,7 +50,15 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 			var ok bool
 			app, ok = s.applications[arg.Value.(string)]
 			if !ok {
-				return nil, fmt.Errorf("application %q not found", arg.Value.(string))
+				if len(s.default_application) > 0 {
+					fmt.Printf("application %q not found, using default application %q\n", arg.Value.(string), s.default_application)
+					app, ok = s.applications[s.default_application]
+					if !ok {
+						return nil, fmt.Errorf("default application %q not found", s.default_application)
+					}
+				} else {
+					return nil, fmt.Errorf("application %q not found", arg.Value.(string))
+				}
 			}
 		case "id":
 			tx = app.waf.NewTransaction(context.Background())
@@ -135,7 +143,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		case "body":
 			body, ok := arg.Value.([]byte)
 			if !ok {
-				return nil, fmt.Errorf("invalid argument for http reqeust body, []byte expected, got %v", arg.Value)
+				return nil, fmt.Errorf("invalid argument for http request body, []byte expected, got %v", arg.Value)
 			}
 
 			_, err := tx.RequestBodyBuffer.Write(body)

@@ -26,8 +26,9 @@ var Global *Config
 
 // Config is used to configure coraza-server.
 type Config struct {
-	Bind         string                  `yaml:"bind"`
-	Applications map[string]*Application `yaml:"applications"`
+	Bind               string                  `yaml:"bind"`
+	DefaultApplication string                  `yaml:"default_application"`
+	Applications       map[string]*Application `yaml:"applications"`
 }
 
 // Application is used to manage the haproxy configuration and waf rules.

@@ -2,6 +2,9 @@
 # The SPOA server bind address
 bind: 0.0.0.0:9000
 
+# Process with this application if request's provided app is not found
+default_application: sample_app
+
 applications:
   sample_app:
     # Get the coraza.conf from https://github.com/corazawaf/coraza

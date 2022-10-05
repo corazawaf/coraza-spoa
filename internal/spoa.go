@@ -48,7 +48,8 @@ type application struct {
 
 // SPOA store the relevant data for starting SPOA.
 type SPOA struct {
-	applications map[string]*application
+	applications        map[string]*application
+	default_application string
 }
 
 // Start starts the SPOA to detect the security risks.
@@ -113,9 +114,9 @@ func (s *SPOA) cleanApplications() {
 }
 
 // New creates a new SPOA instance.
-func New(conf map[string]*config.Application) (*SPOA, error) {
+func New(conf *config.Config) (*SPOA, error) {
 	apps := make(map[string]*application)
-	for name, cfg := range conf {
+	for name, cfg := range conf.Applications {
 		pe := zap.NewProductionEncoderConfig()
 
 		fileEncoder := zapcore.NewJSONEncoder(pe)
@@ -177,6 +178,7 @@ func New(conf map[string]*config.Application) (*SPOA, error) {
 		apps[name] = app
 	}
 	return &SPOA{
-		applications: apps,
+		applications:        apps,
+		default_application: conf.DefaultApplication,
 	}, nil
 }
