@@ -54,10 +54,10 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 					fmt.Printf("application %q not found, using default application %q\n", arg.Value.(string), s.defaultApplication)
 					app, ok = s.applications[s.defaultApplication]
 					if !ok {
-						return nil, fmt.Errorf("default application %q not found", s.defaultApplication)
+						return nil, fmt.Errorf("default application not found: %s", s.defaultApplication)
 					}
 				} else {
-					return nil, fmt.Errorf("application %q not found", arg.Value.(string))
+					return nil, fmt.Errorf("application not found: %v", arg.Value)
 				}
 			}
 		case "id":
