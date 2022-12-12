@@ -8,10 +8,10 @@ applications:
     #
     # Download the OWASP CRS from https://github.com/coreruleset/coreruleset/releases
     # and copy crs-setup.conf & the rules, plugins directories to /etc/coraza-spoa
-    include:
-      - /etc/coraza-spoa/coraza.conf
-      - /etc/coraza-spoa/crs-setup.conf
-      - /etc/coraza-spoa/rules/*.conf
+    rules:
+      - Include /etc/coraza-spoa/coraza.conf
+      - Include /etc/coraza-spoa/crs-setup.conf
+      - Include /etc/coraza-spoa/rules/*.conf
 
     # The transaction cache lifetime(ms)
     transaction_ttl: 60000
