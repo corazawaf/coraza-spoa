@@ -24,7 +24,6 @@ import (
 	"github.com/bluele/gcache"
 	"github.com/corazawaf/coraza-spoa/config"
 	"github.com/corazawaf/coraza/v3"
-	"github.com/corazawaf/coraza/v3/seclang"
 	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
@@ -41,7 +40,7 @@ const (
 type application struct {
 	name   string
 	cfg    *config.Application
-	waf    *coraza.Waf
+	waf    coraza.WAF
 	cache  gcache.Cache
 	logger *zap.Logger
 }
@@ -134,42 +133,33 @@ func New(conf map[string]*config.Application) (*SPOA, error) {
 			zapcore.NewCore(fileEncoder, zapcore.AddSync(f), level),
 		)
 
+		logger := zap.New(core)
+
+		waf, _ := coraza.NewWAF(
+			coraza.NewWAFConfig().WithDirectives(
+				strings.Join(cfg.Rules, "\n"),
+			).WithErrorLogger(func(rule types.MatchedRule) {
+
+			}),
+		)
+
 		app := &application{
 			name:   name,
 			cfg:    cfg,
-			waf:    coraza.NewWaf(),
-			logger: zap.New(core),
-		}
-		app.waf.SetErrorLogCb(func(err types.MatchedRule) {
-			app.logger.Error(err.ErrorLog(500))
-			switch err.Rule.Severity {
-			case types.RuleSeverityCritical:
-			case types.RuleSeverityEmergency:
-			case types.RuleSeverityError:
-			case types.RuleSeverityWarning:
-			case types.RuleSeverityNotice:
-			case types.RuleSeverityInfo:
-			case types.RuleSeverityDebug:
-
-			}
-		})
-		parser, _ := seclang.NewParser(app.waf)
-		for _, f := range app.cfg.Include {
-			if err := parser.FromFile(f); err != nil {
-				return nil, err
-			}
+			waf:    waf,
+			logger: logger,
 		}
 
 		app.cache = gcache.New(app.cfg.TransactionActiveLimit).
 			EvictedFunc(func(key, value interface{}) {
 				// everytime a transaction is timedout we clean it
-				tx, ok := value.(*coraza.Transaction)
+				tx, ok := value.(types.Transaction)
 				if !ok {
 					return
 				}
 				// Process Logging won't do anything if TX was already logged.
 				tx.ProcessLogging()
-				if err := tx.Clean(); err != nil {
+				if err := tx.Close(); err != nil {
 					app.logger.Error("Failed to clean cache", zap.Error(err))
 				}
 			}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()
