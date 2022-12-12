@@ -15,54 +15,40 @@
 package config
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
-	"github.com/corazawaf/coraza-spoa/pkg/logger"
 	"gopkg.in/yaml.v3"
 )
 
-// C is used to store the configuration.
-var C Config
-
-func init() {
-	flag.StringVar(&C.ConfigFile, "config-file", "./config.yml", "The configuration file of the coraza-spoa.")
-}
+// Global is used to store the configuration.
+var Global *Config
 
 // Config is used to configure coraza-server.
 type Config struct {
-	ErrorLog string `yaml:"error_log"`
-	Log      Log    `yaml:"log"`
-	SPOA     SPOA   `yaml:"spoa"`
-
-	// ConfigFile is the configuration file of the coraza-server.
-	ConfigFile string
+	Bind         string                  `yaml:"bind"`
+	Applications map[string]*Application `yaml:"applications"`
 }
 
-// Log is used to configure the level and dir of the log.
-type Log struct {
-	Level string `yaml:"level"`
-	Dir   string `yaml:"dir"`
-}
-
-// SPOA is used to manage the haproxy configuration and waf rules.
-type SPOA struct {
-	Bind                   string   `yaml:"bind"`
+// Application is used to manage the haproxy configuration and waf rules.
+type Application struct {
+	LogLevel               string   `yaml:"log_level"`
+	LogFile                string   `yaml:"log_file"`
+	Directives             string   `yaml:"directives"`
 	Include                []string `yaml:"include"`
 	TransactionTTL         int      `yaml:"transaction_ttl"`
 	TransactionActiveLimit int      `yaml:"transaction_active_limit"`
 }
 
 // InitConfig initializes the configuration.
-func InitConfig() error {
-	f, err := os.Open(C.ConfigFile)
+func InitConfig(file string) error {
+	f, err := os.Open(file)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	err = yaml.NewDecoder(f).Decode(&C)
+	err = yaml.NewDecoder(f).Decode(&Global)
 	if err != nil {
 		return err
 	}
@@ -72,67 +58,22 @@ func InitConfig() error {
 	if err != nil {
 		return err
 	}
-
-	// set the log configuration
-	initLog()
-
 	return nil
 }
 
-func initLog() {
-	var tops = []logger.TeeOption{
-		{
-			Filename: fmt.Sprintf("%s/server.log", C.Log.Dir),
-			ROpts: logger.RotateOptions{
-				MaxSize:    128,
-				MaxAge:     7,
-				MaxBackups: 30,
-				Compress:   true,
-			},
-			Lef: func(level logger.Level) bool {
-				l, err := logger.ParseLevel(C.Log.Level)
-				if err != nil {
-					l = logger.InfoLevel
-				}
-				if level < logger.ErrorLevel {
-					return level >= l
-				}
-				return false
-			},
-		},
-		{
-			Filename: fmt.Sprintf("%s/error.log", C.Log.Dir),
-			ROpts: logger.RotateOptions{
-				MaxSize:    128,
-				MaxAge:     7,
-				MaxBackups: 30,
-				Compress:   true,
-			},
-			Lef: func(level logger.Level) bool {
-				return level >= logger.ErrorLevel
-			},
-		},
-	}
-
-	// reset default logger for using global logger
-	logger.NewTeeWithRotate(tops, logger.WithCaller(true)).Reset()
-}
-
 func validateConfig() error {
-	if C.Log.Dir == "" {
-		C.Log.Dir = "./logs"
-	}
+	fmt.Printf("Loading %d applications\n", len(Global.Applications))
+	for _, app := range Global.Applications {
+		if app.LogLevel == "" {
+			app.LogLevel = "warn"
+		}
+		if app.TransactionTTL < 0 {
+			return fmt.Errorf("SPOA transaction ttl must be greater than 0")
+		}
 
-	if C.Log.Level == "" {
-		C.Log.Level = "warn"
-	}
-
-	if C.SPOA.TransactionTTL <= 0 {
-		return fmt.Errorf("SPOA transaction ttl must be greater than 0")
-	}
-
-	if C.SPOA.TransactionActiveLimit <= 0 {
-		return fmt.Errorf("SPOA transaction active limit must be greater than 0")
+		if app.TransactionActiveLimit < 0 {
+			return fmt.Errorf("SPOA transaction active limit must be greater than 0")
+		}
 	}
 	return nil
 }

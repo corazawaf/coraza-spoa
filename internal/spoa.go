@@ -16,8 +16,6 @@ package internal
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -25,30 +23,37 @@ import (
 
 	"github.com/bluele/gcache"
 	"github.com/corazawaf/coraza-spoa/config"
-	"github.com/corazawaf/coraza-spoa/pkg/logger"
-	"github.com/corazawaf/coraza/v2"
-	"github.com/corazawaf/coraza/v2/seclang"
+	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/seclang"
+	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
-	// Miss sets the detection result to safe.
-	Miss = iota
-	// Hit opposite to Miss.
-	Hit
+	// miss sets the detection result to safe.
+	miss = iota
+	// hit opposite to Miss.
+	hit
 )
+
+type application struct {
+	name   string
+	cfg    *config.Application
+	waf    *coraza.Waf
+	cache  gcache.Cache
+	logger *zap.Logger
+}
 
 // SPOA store the relevant data for starting SPOA.
 type SPOA struct {
-	cfg   *config.SPOA
-	waf   *coraza.Waf
-	cache gcache.Cache
+	applications map[string]*application
 }
 
 // Start starts the SPOA to detect the security risks.
-func (s *SPOA) Start() error {
-	logger.Info("Starting SPOA")
+func (s *SPOA) Start(bind string) error {
+	// s.logger.Info("Starting SPOA")
 
 	agent := spoe.New(func(messages *spoe.MessageIterator) ([]spoe.Action, error) {
 		for messages.Next() {
@@ -59,13 +64,12 @@ func (s *SPOA) Start() error {
 				return s.processRequest(msg)
 			case "coraza-res":
 				return s.processResponse(msg)
-			default:
-				logger.Error(fmt.Sprintf("unsupported message: %s", msg.Name))
 			}
 		}
 		return nil, nil
 	})
-	if err := agent.ListenAndServe(s.cfg.Bind); err != nil {
+	defer s.cleanApplications()
+	if err := agent.ListenAndServe(bind); err != nil {
 		return err
 	}
 	return nil
@@ -92,7 +96,7 @@ func (s *SPOA) readHeaders(headers string) (http.Header, error) {
 
 		kv := strings.SplitN(header, ":", 2)
 		if len(kv) != 2 {
-			return nil, fmt.Errorf("invalid header: %s", header)
+			return nil, fmt.Errorf("invalid header: %q", header)
 		}
 
 		h.Add(strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1]))
@@ -100,50 +104,79 @@ func (s *SPOA) readHeaders(headers string) (http.Header, error) {
 	return h, nil
 }
 
-// New creates a new SPOA instance.
-func New(cfg *config.SPOA) (*SPOA, error) {
-	s := new(SPOA)
-	s.cfg = cfg
-
-	s.waf = coraza.NewWaf()
-	f := config.C.ErrorLog
-	var writer io.Writer
-	if f != "" {
-		f, err := os.OpenFile(f, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		if err != nil {
-			log.Fatalf("error opening file: %v", err)
+func (s *SPOA) cleanApplications() {
+	for _, app := range s.applications {
+		if err := app.logger.Sync(); err != nil {
+			app.logger.Error("failed to sync logger", zap.Error(err))
 		}
-		writer = io.MultiWriter(os.Stdout, f)
-	} else {
-		writer = os.Stdout
 	}
-	l := log.New(writer, "coraza", log.LstdFlags|log.Lshortfile)
-	s.waf.SetErrorLogCb(func(err coraza.MatchedRule) {
-		l.Println(err.ErrorLog(0))
-	})
-	parser, _ := seclang.NewParser(s.waf)
-	if len(s.cfg.Include) == 0 {
-		logger.Warn("No include path or file specified")
-	}
+}
 
-	for _, f := range s.cfg.Include {
-		if err := parser.FromFile(f); err != nil {
+// New creates a new SPOA instance.
+func New(conf map[string]*config.Application) (*SPOA, error) {
+	apps := make(map[string]*application)
+	for name, cfg := range conf {
+		pe := zap.NewProductionEncoderConfig()
+
+		fileEncoder := zapcore.NewJSONEncoder(pe)
+
+		pe.EncodeTime = zapcore.ISO8601TimeEncoder
+
+		level, err := zapcore.ParseLevel(cfg.LogLevel)
+		if err != nil {
+			level = zap.InfoLevel
+		}
+		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
 			return nil, err
 		}
-	}
+		core := zapcore.NewTee(
+			zapcore.NewCore(fileEncoder, zapcore.AddSync(f), level),
+		)
 
-	s.cache = gcache.New(s.cfg.TransactionActiveLimit).
-		EvictedFunc(func(key, value interface{}) {
-			// everytime a transaction is timedout we clean it
-			tx, ok := value.(*coraza.Transaction)
-			if !ok {
-				return
+		app := &application{
+			name:   name,
+			cfg:    cfg,
+			waf:    coraza.NewWaf(),
+			logger: zap.New(core),
+		}
+		app.waf.SetErrorLogCb(func(err types.MatchedRule) {
+			app.logger.Error(err.ErrorLog(500))
+			switch err.Rule.Severity {
+			case types.RuleSeverityCritical:
+			case types.RuleSeverityEmergency:
+			case types.RuleSeverityError:
+			case types.RuleSeverityWarning:
+			case types.RuleSeverityNotice:
+			case types.RuleSeverityInfo:
+			case types.RuleSeverityDebug:
+
 			}
-			// Process Logging won't do anything if TX was already logged.
-			tx.ProcessLogging()
-			if err := tx.Clean(); err != nil {
-				logger.Error("Failed to clean cache", zap.Error(err))
+		})
+		parser, _ := seclang.NewParser(app.waf)
+		for _, f := range app.cfg.Include {
+			if err := parser.FromFile(f); err != nil {
+				return nil, err
 			}
-		}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()
-	return s, nil
+		}
+
+		app.cache = gcache.New(app.cfg.TransactionActiveLimit).
+			EvictedFunc(func(key, value interface{}) {
+				// everytime a transaction is timedout we clean it
+				tx, ok := value.(*coraza.Transaction)
+				if !ok {
+					return
+				}
+				// Process Logging won't do anything if TX was already logged.
+				tx.ProcessLogging()
+				if err := tx.Clean(); err != nil {
+					app.logger.Error("Failed to clean cache", zap.Error(err))
+				}
+			}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()
+
+		apps[name] = app
+	}
+	return &SPOA{
+		applications: apps,
+	}, nil
 }
