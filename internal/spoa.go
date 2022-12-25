@@ -37,6 +37,9 @@ const (
 	hit
 )
 
+// TODO - in coraza v3 ErrorLogCallback is currently in the internal package
+type ErrorLogCallback = func(rule types.MatchedRule)
+
 type application struct {
 	name   string
 	cfg    *config.Application
@@ -72,6 +75,45 @@ func (s *SPOA) Start(bind string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *SPOA) processInterruption(it *types.Interruption, code int) []spoe.Action {
+	//if it.Status == 0 {
+	//  tx.variables.responseStatus.Set("", []string{"403"})
+	//} else {
+	//  status := strconv.Itoa(int(it.Status))
+	//  tx.variables.responseStatus.Set("", []string{status})
+	//}
+
+	return []spoe.Action{
+		spoe.ActionSetVar{
+			Name:  "status",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.Status,
+		},
+		spoe.ActionSetVar{
+			Name:  "action",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.Action,
+		},
+		spoe.ActionSetVar{
+			Name:  "data",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.Data,
+		},
+		spoe.ActionSetVar{
+			Name:  "ruleid",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.RuleID,
+		},
+		// TODO - deprected, don't use this anymore.
+		//  will be removed in a future version.
+		spoe.ActionSetVar{
+			Name:  "fail",
+			Scope: spoe.VarScopeTransaction,
+			Value: code,
+		},
+	}
 }
 
 func (s *SPOA) message(code int) []spoe.Action {
@@ -111,6 +153,30 @@ func (s *SPOA) cleanApplications() {
 	}
 }
 
+func logError(logger *zap.Logger) ErrorLogCallback {
+	return func(mr types.MatchedRule) {
+		data := mr.ErrorLog(0)
+		switch mr.Rule().Severity() {
+		case types.RuleSeverityEmergency:
+			logger.Error(data)
+		case types.RuleSeverityAlert:
+			logger.Error(data)
+		case types.RuleSeverityCritical:
+			logger.Error(data)
+		case types.RuleSeverityError:
+			logger.Error(data)
+		case types.RuleSeverityWarning:
+			logger.Warn(data)
+		case types.RuleSeverityNotice:
+			logger.Info(data)
+		case types.RuleSeverityInfo:
+			logger.Info(data)
+		case types.RuleSeverityDebug:
+			logger.Debug(data)
+		}
+	}
+}
+
 // New creates a new SPOA instance.
 func New(conf map[string]*config.Application) (*SPOA, error) {
 	apps := make(map[string]*application)
@@ -138,10 +204,7 @@ func New(conf map[string]*config.Application) (*SPOA, error) {
 		waf, _ := coraza.NewWAF(
 			coraza.NewWAFConfig().WithDirectives(
 				strings.Join(cfg.Rules, "\n"),
-			).WithErrorLogger(func(rule types.MatchedRule) {
-
-			}),
-		)
+			).WithErrorLogger(logError(logger)))
 
 		app := &application{
 			name:   name,

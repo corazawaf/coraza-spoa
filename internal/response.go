@@ -104,14 +104,14 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 	}
 
 	if it := tx.ProcessResponseHeaders(status, "HTTP/"+version); it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 	it, err := tx.ProcessResponseBody()
 	if err != nil {
 		return nil, err
 	}
 	if it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 
 	return s.message(miss), nil

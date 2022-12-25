@@ -56,7 +56,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
-			tx := app.waf.NewTransactionWithID(id)
+			tx = app.waf.NewTransactionWithID(id)
 			//tx.Variables.UniqueID.Set(tx.ID)
 			defer func() {
 				if tx.IsInterrupted() {
@@ -146,21 +146,21 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		}
 	}
 
-	// logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
+	//app.logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
 	tx.ProcessConnection(srcIP.String(), srcPort, dstIP.String(), dstPort)
 
-	// logger.Debug(fmt.Sprintf("ProcessURI: %s?%s %s %s", path, query, method, "HTTP/"+version))
+	//app.logger.Debug(fmt.Sprintf("ProcessURI: %s %s?%s %s", method, path, query, "HTTP/"+version))
 	tx.ProcessURI(path+"?"+query, method, "HTTP/"+version)
 
 	if it := tx.ProcessRequestHeaders(); it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 	it, err := tx.ProcessRequestBody()
 	if err != nil {
 		return nil, err
 	}
 	if it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 	return s.message(miss), nil
 }
