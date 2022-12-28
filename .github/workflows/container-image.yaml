@@ -11,6 +11,7 @@ on:
   pull_request:
   workflow_dispatch:
 
+
 env:
   HAPROXY_IMAGES: >
     haproxy:2.2-alpine
@@ -29,7 +30,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
 
-     - name: Run e2e tests against the example
+      - name: Run e2e tests against the example
         shell: bash
         run: >
           for image in $HAPROXY_IMAGES; do
