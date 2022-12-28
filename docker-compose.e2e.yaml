@@ -12,7 +12,7 @@ services:
     depends_on:
       - coraza
       - httpbin
-    image: haproxy:2.7-alpine
+    image: ${HAPROXY_IMAGE:-haproxy:2.7-alpine}
     ports: [ "4000:80" ]
     links:
       - "coraza:coraza"

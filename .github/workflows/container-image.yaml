@@ -11,6 +11,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  HAPROXY_IMAGES: >
+  haproxy:2.2-alpine
+  haproxy:2.4-alpine
+  haproxy:2.5-alpine
+  haproxy:2.6-alpine
+  haproxy:2.7-alpine
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -20,6 +28,14 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v3
+
+     - name: Run e2e tests against the example
+        shell: bash
+        run: >
+          for image in $HAPROXY_IMAGES; do
+              echo "Running e2e with Haproxy image $image"
+              HAPROXY_IMAGE=$image docker compose -f docker-compose.e2e.yaml up --abort-on-container-exit test
+          done
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
