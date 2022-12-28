@@ -1,0 +1,33 @@
+version: "3.9"
+services:
+  httpbin:
+    image: mccutchen/go-httpbin:v2.5.0
+    ports:
+      - 8080
+  coraza:
+    build: .
+    volumes:
+      - ./docker/e2e/e2e-rules.conf:/etc/coraza-spoa/rules/000-e2e-rules.conf
+  haproxy:
+    depends_on:
+      - coraza
+      - httpbin
+    image: haproxy:2.7-alpine
+    ports: [ "4000:80" ]
+    links:
+      - "coraza:coraza"
+      - "httpbin:httpbin"
+    volumes:
+      - type: bind
+        source: ./docker/haproxy
+        target: /usr/local/etc/haproxy
+  tests:
+    depends_on:
+      - haproxy
+      - coraza
+    links:
+      - "haproxy:haproxy"
+      - "httpbin:httpbin"
+    build:
+      context: docker/e2e
+      dockerfile: ./Dockerfile.curl
