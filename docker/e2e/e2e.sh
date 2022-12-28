@@ -1,6 +1,10 @@
 #!/bin/bash
 # Copyright 2022 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
+#
+# Script derived from the original in coraza-proxy-wasm & extended for haproxy
+# https://github.com/corazawaf/coraza-proxy-wasm/blob/main/e2e/e2e-example.sh
+
 HAPROXY_HOST=${HAPROXY_HOST:-"localhost:4000"}
 HTTPBIN_HOST=${HTTPBIN_HOST:-"localhost:8080"}
 
