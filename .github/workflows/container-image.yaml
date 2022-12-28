@@ -35,7 +35,7 @@ jobs:
         run: >
           for image in $HAPROXY_IMAGES; do
               echo "Running e2e with Haproxy image $image"
-              HAPROXY_IMAGE=$image docker compose -f docker-compose.e2e.yaml up --abort-on-container-exit test
+              HAPROXY_IMAGE=$image docker compose -f docker-compose.e2e.yaml up --abort-on-container-exit tests
           done
 
       - name: Set up Docker Buildx
