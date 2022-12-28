@@ -13,11 +13,11 @@ on:
 
 env:
   HAPROXY_IMAGES: >
-  haproxy:2.2-alpine
-  haproxy:2.4-alpine
-  haproxy:2.5-alpine
-  haproxy:2.6-alpine
-  haproxy:2.7-alpine
+    haproxy:2.2-alpine
+    haproxy:2.4-alpine
+    haproxy:2.5-alpine
+    haproxy:2.6-alpine
+    haproxy:2.7-alpine
 
 jobs:
   build:
