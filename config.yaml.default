@@ -13,9 +13,9 @@ applications:
       - Include /etc/coraza-spoa/crs-setup.conf
       - Include /etc/coraza-spoa/rules/*.conf
 
-    # The transaction cache lifetime(ms)
-    transaction_ttl: 60000
-    # The transaction cache limit
+    # The transaction cache lifetime (seconds)
+    transaction_ttl: 60
+    # The maximum number of transactions which can be cached
     transaction_active_limit: 100000
 
     # The log level configuration, one of: debug/info/warn/error/panic/fatal
