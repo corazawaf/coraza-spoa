@@ -5,7 +5,7 @@ ARG CORERULESET_VERSION=v4.0.0-rc1
 ARG CORERULESET_MD5=9140236dc7e941c274e414385824c996
 
 # Change working directory
-WORKDIR /app
+WORKDIR /home/coraza-spoa
 
 RUN \
     apk add --no-cache \
@@ -32,25 +32,23 @@ COPY . .
 # Build coraza-spoa binary
 RUN make
 
-RUN \
-    # Move coraza-spoa config file to config dir
-    mv /app/docker/coraza-spoa/coraza.conf /etc/coraza-spoa/coraza.conf \
-    # Rename coraza-spoa default config file
-    && mv /app/config.yaml.default /app/config.yaml \
-    # Rename coraza-spoa binary
-    && mv /app/coraza-spoa_amd64 /app/coraza-spoa \
-    # Make coraza-spoa binary executable
-    && chmod +x /app/coraza-spoa
-
-
+# --------------------------
 
 FROM alpine:3.16
-# Make directory for coraza-spoa audit and error logs
-RUN mkdir -p /var/log/coraza-spoa
-# Copy coraza-spoa binary and default config file from build image
-COPY --from=build /app/config.yaml /app/coraza-spoa /
-# Copy Coreruleset files from build image
-COPY --from=build /etc/coraza-spoa /etc/coraza-spoa
+RUN addgroup -g 1001 coraza-spoa \
+ && adduser -u 1001 -G coraza-spoa -D -s /bin/false coraza-spoa \
+ && mkdir -p /var/log/coraza-spoa \
+ && chown coraza-spoa:coraza-spoa /var/log/coraza-spoa
 
-# Container run command
-CMD ["/coraza-spoa", "-config", "/config.yaml"]
+# Copy Coreruleset files and binary from build image
+COPY --from=build /etc/coraza-spoa /etc/coraza-spoa
+COPY --from=build /home/coraza-spoa/docker/coraza-spoa/coraza.conf /etc/coraza-spoa/coraza.conf
+COPY --from=build /home/coraza-spoa/config.yaml.default /home/coraza-spoa/config.yaml
+COPY --from=build /home/coraza-spoa/coraza-spoa_amd64 /usr/local/bin/coraza-spoa
+# Make binary executable and change the owner of files in the home folder
+RUN chmod +x /usr/local/bin/coraza-spoa && chown -R coraza-spoa:coraza-spoa /home/coraza-spoa
+
+USER coraza-spoa
+WORKDIR /home/coraza-spoa/
+
+CMD ["coraza-spoa", "-config", "config.yaml"]
