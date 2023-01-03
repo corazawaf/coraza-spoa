@@ -1,35 +1,16 @@
-name: "Code Linting"
+name: Lint (pre-commit)
 
 on:
   pull_request:
-    branches:
-      - "*"
   push:
-    branches:
-      - "*"
-
 jobs:
-  pre-commit:
+  lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: v1.17.x
-
-      - name: Install dependencies
-        run: |
-          cd /tmp && go install github.com/go-critic/go-critic/cmd/gocritic@latest
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.43.0
-          go install golang.org/x/lint/golint@latest
-          go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
-
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v2
-
-      - name: Fix up git URLs
-        run: echo -e '[url "https://github.com/"]\n  insteadOf = "git://github.com/"' >> ~/.gitconfig
-
-      - uses: pre-commit/action@v2.0.3
+      - name: Install Go
+        uses: actions/setup-go@v3
         with:
-          extra_args: --all-files
+          go-version: v1.18.x
+          cache: true
+      - run: go run mage.go lint
