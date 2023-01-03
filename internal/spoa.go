@@ -12,7 +12,6 @@ import (
 
 	"github.com/bluele/gcache"
 	"github.com/corazawaf/coraza/v3"
-	"github.com/corazawaf/coraza/v3/seclang"
 	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
@@ -28,10 +27,13 @@ const (
 	hit
 )
 
+// TODO - in coraza v3 ErrorLogCallback is currently in the internal package
+type ErrorLogCallback = func(rule types.MatchedRule)
+
 type application struct {
 	name   string
 	cfg    *config.Application
-	waf    *coraza.Waf
+	waf    coraza.WAF
 	cache  gcache.Cache
 	logger *zap.Logger
 }
@@ -63,6 +65,45 @@ func (s *SPOA) Start(bind string) error {
 		return err
 	}
 	return nil
+}
+
+func (s *SPOA) processInterruption(it *types.Interruption, code int) []spoe.Action {
+	//if it.Status == 0 {
+	//  tx.variables.responseStatus.Set("", []string{"403"})
+	//} else {
+	//  status := strconv.Itoa(int(it.Status))
+	//  tx.variables.responseStatus.Set("", []string{status})
+	//}
+
+	return []spoe.Action{
+		spoe.ActionSetVar{
+			Name:  "status",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.Status,
+		},
+		spoe.ActionSetVar{
+			Name:  "action",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.Action,
+		},
+		spoe.ActionSetVar{
+			Name:  "data",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.Data,
+		},
+		spoe.ActionSetVar{
+			Name:  "ruleid",
+			Scope: spoe.VarScopeTransaction,
+			Value: it.RuleID,
+		},
+		// TODO - deprected, don't use this anymore.
+		//  will be removed in a future version.
+		spoe.ActionSetVar{
+			Name:  "fail",
+			Scope: spoe.VarScopeTransaction,
+			Value: code,
+		},
+	}
 }
 
 func (s *SPOA) message(code int) []spoe.Action {
@@ -102,6 +143,30 @@ func (s *SPOA) cleanApplications() {
 	}
 }
 
+func logError(logger *zap.Logger) ErrorLogCallback {
+	return func(mr types.MatchedRule) {
+		data := mr.ErrorLog(0)
+		switch mr.Rule().Severity() {
+		case types.RuleSeverityEmergency:
+			logger.Error(data)
+		case types.RuleSeverityAlert:
+			logger.Error(data)
+		case types.RuleSeverityCritical:
+			logger.Error(data)
+		case types.RuleSeverityError:
+			logger.Error(data)
+		case types.RuleSeverityWarning:
+			logger.Warn(data)
+		case types.RuleSeverityNotice:
+			logger.Info(data)
+		case types.RuleSeverityInfo:
+			logger.Info(data)
+		case types.RuleSeverityDebug:
+			logger.Debug(data)
+		}
+	}
+}
+
 // New creates a new SPOA instance.
 func New(conf map[string]*config.Application) (*SPOA, error) {
 	apps := make(map[string]*application)
@@ -124,42 +189,35 @@ func New(conf map[string]*config.Application) (*SPOA, error) {
 			zapcore.NewCore(fileEncoder, zapcore.AddSync(f), level),
 		)
 
+		logger := zap.New(core)
+
+		conf := coraza.NewWAFConfig().
+			WithDirectives(strings.Join(cfg.Rules, "\n")).
+			WithErrorLogger(logError(logger))
+
+		waf, err := coraza.NewWAF(conf)
+		if err != nil {
+			logger.Error("unable to create waf instance", zap.String("app", name), zap.Error(err))
+			return nil, err
+		}
+
 		app := &application{
 			name:   name,
 			cfg:    cfg,
-			waf:    coraza.NewWaf(),
-			logger: zap.New(core),
-		}
-		app.waf.SetErrorLogCb(func(err types.MatchedRule) {
-			app.logger.Error(err.ErrorLog(500))
-			switch err.Rule.Severity {
-			case types.RuleSeverityCritical:
-			case types.RuleSeverityEmergency:
-			case types.RuleSeverityError:
-			case types.RuleSeverityWarning:
-			case types.RuleSeverityNotice:
-			case types.RuleSeverityInfo:
-			case types.RuleSeverityDebug:
-
-			}
-		})
-		parser, _ := seclang.NewParser(app.waf)
-		for _, f := range app.cfg.Include {
-			if err := parser.FromFile(f); err != nil {
-				return nil, err
-			}
+			waf:    waf,
+			logger: logger,
 		}
 
 		app.cache = gcache.New(app.cfg.TransactionActiveLimit).
 			EvictedFunc(func(key, value interface{}) {
 				// everytime a transaction is timedout we clean it
-				tx, ok := value.(*coraza.Transaction)
+				tx, ok := value.(types.Transaction)
 				if !ok {
 					return
 				}
 				// Process Logging won't do anything if TX was already logged.
 				tx.ProcessLogging()
-				if err := tx.Clean(); err != nil {
+				if err := tx.Close(); err != nil {
 					app.logger.Error("Failed to clean cache", zap.Error(err))
 				}
 			}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()

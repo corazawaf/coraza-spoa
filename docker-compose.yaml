@@ -1,21 +1,18 @@
 version: "3.9"
 services:
+  httpbin:
+    image: mccutchen/go-httpbin:v2.5.0
+    ports:
+      - 8080
   coraza:
     build: .
   haproxy:
-    image: haproxy:2.5.7-bullseye
+    image: haproxy:2.7-alpine
     ports: [ "4000:80", "4443:443", "4001:4001" ]
     links:
       - "coraza:coraza"
-      - "mockserv:mockserv"
+      - "httpbin:httpbin"
     volumes:
       - type: bind
         source: ./docker/haproxy
         target: /usr/local/etc/haproxy
-  mockserv:
-    image: golang:1.18-bullseye
-    command: go run /mockserv.go
-    volumes:
-      - type: bind
-        source: ./contrib/mockserv.go
-        target: /mockserv.go

@@ -1,0 +1,16 @@
+# Copyright 2022 The OWASP Coraza contributors
+# SPDX-License-Identifier: Apache-2.0
+
+FROM curlimages/curl
+USER root
+
+WORKDIR /workspace
+
+RUN apk add --no-cache bash
+
+COPY ./e2e.sh /workspace/e2e.sh
+
+ENV HAPROXY_HOST=haproxy:80
+ENV HTTPBIN_HOST=httpbin:8080
+
+CMD ["bash","-c", "/workspace/e2e.sh"]

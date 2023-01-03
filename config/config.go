@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // Global is used to store the configuration.
@@ -23,8 +23,7 @@ type Config struct {
 type Application struct {
 	LogLevel               string   `yaml:"log_level"`
 	LogFile                string   `yaml:"log_file"`
-	Directives             string   `yaml:"directives"`
-	Include                []string `yaml:"include"`
+	Rules                  []string `yaml:"rules"`
 	TransactionTTL         int      `yaml:"transaction_ttl"`
 	TransactionActiveLimit int      `yaml:"transaction_active_limit"`
 }

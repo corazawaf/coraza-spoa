@@ -4,12 +4,11 @@
 package internal
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"time"
 
-	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
 )
@@ -25,7 +24,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		srcPort = 0
 		dstIP   net.IP
 		dstPort = 0
-		tx      = new(coraza.Transaction)
+		tx      types.Transaction
 	)
 	var app *application
 	for msg.Args.Next() {
@@ -42,20 +41,20 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("application %q not found", arg.Value.(string))
 			}
 		case "id":
-			tx = app.waf.NewTransaction(context.Background())
-			tx.ID, ok = arg.Value.(string)
+			id, ok := arg.Value.(string)
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
-			tx.Variables.UniqueID.Set(tx.ID)
+			tx = app.waf.NewTransactionWithID(id)
+			//tx.Variables.UniqueID.Set(tx.ID)
 			defer func() {
-				if tx.Interrupted() {
+				if tx.IsInterrupted() {
 					tx.ProcessLogging()
-					if err := tx.Clean(); err != nil {
-						app.logger.Error("failed to clean transaction", zap.String("transaction_id", tx.ID), zap.String("error", err.Error()))
+					if err := tx.Close(); err != nil {
+						app.logger.Error("failed to close transaction", zap.String("transaction_id", id), zap.String("error", err.Error()))
 					}
 				} else {
-					err := app.cache.SetWithExpire(tx.ID, tx, time.Millisecond*time.Duration(app.cfg.TransactionTTL))
+					err := app.cache.SetWithExpire(id, tx, time.Millisecond*time.Duration(app.cfg.TransactionTTL))
 					if err != nil {
 						app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
 					}
@@ -127,7 +126,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("invalid argument for http reqeust body, []byte expected, got %v", arg.Value)
 			}
 
-			_, err := tx.RequestBodyBuffer.Write(body)
+			_, err := tx.RequestBodyWriter().Write(body)
 			if err != nil {
 				return nil, err
 			}
@@ -136,21 +135,21 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		}
 	}
 
-	// logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
+	//app.logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
 	tx.ProcessConnection(srcIP.String(), srcPort, dstIP.String(), dstPort)
 
-	// logger.Debug(fmt.Sprintf("ProcessURI: %s?%s %s %s", path, query, method, "HTTP/"+version))
+	//app.logger.Debug(fmt.Sprintf("ProcessURI: %s %s?%s %s", method, path, query, "HTTP/"+version))
 	tx.ProcessURI(path+"?"+query, method, "HTTP/"+version)
 
 	if it := tx.ProcessRequestHeaders(); it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 	it, err := tx.ProcessRequestBody()
 	if err != nil {
 		return nil, err
 	}
 	if it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 	return s.message(miss), nil
 }

@@ -6,7 +6,7 @@ package internal
 import (
 	"fmt"
 
-	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
 )
@@ -18,7 +18,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 		id      = ""
 		status  = 0
 		version = ""
-		tx      = new(coraza.Transaction)
+		tx      types.Transaction
 	)
 	defer func() {
 		app.cache.Remove(id)
@@ -48,7 +48,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 				break
 			}
 
-			if tx, ok = txInterface.(*coraza.Transaction); !ok {
+			if tx, ok = txInterface.(types.Transaction); !ok {
 				app.logger.Error("Application cache is corrupted", zap.String("transaction_id", id), zap.String("app", app.name))
 				return nil, fmt.Errorf("application cache is corrupted")
 			}
@@ -83,7 +83,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http response body, []byte expected, got %v", arg.Value)
 			}
-			_, err := tx.ResponseBodyBuffer.Write(body)
+			_, err := tx.ResponseBodyWriter().Write(body)
 			if err != nil {
 				return nil, err
 			}
@@ -93,14 +93,14 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 	}
 
 	if it := tx.ProcessResponseHeaders(status, "HTTP/"+version); it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 	it, err := tx.ProcessResponseBody()
 	if err != nil {
 		return nil, err
 	}
 	if it != nil {
-		return s.message(hit), nil
+		return s.processInterruption(it, hit), nil
 	}
 
 	return s.message(miss), nil
