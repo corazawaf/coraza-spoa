@@ -1,3 +1,6 @@
+# Copyright 2023 The OWASP Coraza contributors
+# SPDX-License-Identifier: Apache-2.0
+
 FROM golang:1.19.1-alpine3.16 AS build
 
 # Specify Coreruleset version to download
@@ -9,8 +12,8 @@ WORKDIR /app
 
 RUN \
     apk add --no-cache \
-        # Install make to build coraza-spoa binary from makefile
-        make \
+    # Install make to build coraza-spoa binary from makefile
+    make \
     # Download and set up Coreruleset
     && wget -qO/tmp/coreruleset.tar.gz https://github.com/coreruleset/coreruleset/archive/${CORERULESET_VERSION}.tar.gz \
     && echo "$CORERULESET_MD5  /tmp/coreruleset.tar.gz" | md5sum -c \
