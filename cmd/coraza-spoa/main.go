@@ -19,7 +19,7 @@ func main() {
 	if err := config.InitConfig(*cfg); err != nil {
 		panic(err)
 	}
-	spoa, err := internal.New(config.Global.Applications)
+	spoa, err := internal.New(config.Global)
 	if err != nil {
 		panic(err)
 	}
