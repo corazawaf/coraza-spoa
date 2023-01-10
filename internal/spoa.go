@@ -221,7 +221,7 @@ func New(conf *config.Config) (*SPOA, error) {
 				if err := tx.Close(); err != nil {
 					app.logger.Error("Failed to clean cache", zap.Error(err))
 				}
-			}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()
+			}).LFU().Expiration(time.Duration(cfg.TransactionTTLSeconds) * time.Second).Build()
 
 		apps[name] = app
 	}

@@ -25,7 +25,7 @@ type Application struct {
 	LogLevel               string   `yaml:"log_level"`
 	LogFile                string   `yaml:"log_file"`
 	Rules                  []string `yaml:"rules"`
-	TransactionTTL         int      `yaml:"transaction_ttl"`
+	TransactionTTLSeconds  int      `yaml:"transaction_ttl_seconds"`
 	TransactionActiveLimit int      `yaml:"transaction_active_limit"`
 }
 
@@ -56,7 +56,7 @@ func validateConfig() error {
 		if app.LogLevel == "" {
 			app.LogLevel = "warn"
 		}
-		if app.TransactionTTL < 0 {
+		if app.TransactionTTLSeconds < 0 {
 			return fmt.Errorf("SPOA transaction ttl must be greater than 0")
 		}
 
