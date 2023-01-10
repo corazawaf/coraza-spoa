@@ -22,11 +22,11 @@ type Config struct {
 
 // Application is used to manage the haproxy configuration and waf rules.
 type Application struct {
-	LogLevel               string   `yaml:"log_level"`
-	LogFile                string   `yaml:"log_file"`
-	Rules                  []string `yaml:"rules"`
-	TransactionTTLSeconds  int      `yaml:"transaction_ttl_seconds"`
-	TransactionActiveLimit int      `yaml:"transaction_active_limit"`
+	LogLevel                   string   `yaml:"log_level"`
+	LogFile                    string   `yaml:"log_file"`
+	Rules                      []string `yaml:"rules"`
+	TransactionTTLMilliseconds int      `yaml:"transaction_ttl_ms"`
+	TransactionActiveLimit     int      `yaml:"transaction_active_limit"`
 }
 
 // InitConfig initializes the configuration.
@@ -56,7 +56,7 @@ func validateConfig() error {
 		if app.LogLevel == "" {
 			app.LogLevel = "warn"
 		}
-		if app.TransactionTTLSeconds < 0 {
+		if app.TransactionTTLMilliseconds < 0 {
 			return fmt.Errorf("SPOA transaction ttl must be greater than 0")
 		}
 
