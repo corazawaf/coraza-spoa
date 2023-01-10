@@ -62,7 +62,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 						app.logger.Error("failed to close transaction", zap.String("transaction_id", id), zap.String("error", err.Error()))
 					}
 				} else {
-					err := app.cache.SetWithExpire(id, tx, time.Millisecond*time.Duration(app.cfg.TransactionTTL))
+					err := app.cache.SetWithExpire(id, tx, time.Second*time.Duration(app.cfg.TransactionTTL))
 					if err != nil {
 						app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
 					}
