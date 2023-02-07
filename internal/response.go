@@ -34,7 +34,15 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 			var ok bool
 			app, ok = s.applications[arg.Value.(string)]
 			if !ok {
-				return nil, fmt.Errorf("application %q not found", arg.Value.(string))
+				if len(s.defaultApplication) > 0 {
+					app, ok = s.applications[s.defaultApplication]
+					if !ok {
+						return nil, fmt.Errorf("default application not found: %s", s.defaultApplication)
+					}
+					app.logger.Debug("application not found, using default", zap.Any("application", arg.Value), zap.String("default", s.defaultApplication))
+				} else {
+					return nil, fmt.Errorf("application not found: %v", arg.Value)
+				}
 			}
 		case "id":
 			id, ok := arg.Value.(string)

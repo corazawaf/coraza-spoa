@@ -1,12 +1,15 @@
 version: "3.9"
 services:
   httpbin:
+    restart: unless-stopped
     image: mccutchen/go-httpbin:v2.5.0
     ports:
       - 8080
   coraza:
+    restart: unless-stopped
     build: .
   haproxy:
+    restart: unless-stopped
     image: haproxy:2.7-alpine
     ports: [ "4000:80", "4443:443", "4001:4001" ]
     links:

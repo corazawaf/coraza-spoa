@@ -15,17 +15,18 @@ var Global *Config
 
 // Config is used to configure coraza-server.
 type Config struct {
-	Bind         string                  `yaml:"bind"`
-	Applications map[string]*Application `yaml:"applications"`
+	Bind               string                  `yaml:"bind"`
+	DefaultApplication string                  `yaml:"default_application"`
+	Applications       map[string]*Application `yaml:"applications"`
 }
 
 // Application is used to manage the haproxy configuration and waf rules.
 type Application struct {
-	LogLevel               string   `yaml:"log_level"`
-	LogFile                string   `yaml:"log_file"`
-	Rules                  []string `yaml:"rules"`
-	TransactionTTL         int      `yaml:"transaction_ttl"`
-	TransactionActiveLimit int      `yaml:"transaction_active_limit"`
+	LogLevel                   string   `yaml:"log_level"`
+	LogFile                    string   `yaml:"log_file"`
+	Rules                      []string `yaml:"rules"`
+	TransactionTTLMilliseconds int      `yaml:"transaction_ttl_ms"`
+	TransactionActiveLimit     int      `yaml:"transaction_active_limit"`
 }
 
 // InitConfig initializes the configuration.
@@ -55,7 +56,7 @@ func validateConfig() error {
 		if app.LogLevel == "" {
 			app.LogLevel = "warn"
 		}
-		if app.TransactionTTL < 0 {
+		if app.TransactionTTLMilliseconds < 0 {
 			return fmt.Errorf("SPOA transaction ttl must be greater than 0")
 		}
 

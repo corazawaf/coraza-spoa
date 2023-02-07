@@ -40,7 +40,8 @@ type application struct {
 
 // SPOA store the relevant data for starting SPOA.
 type SPOA struct {
-	applications map[string]*application
+	applications       map[string]*application
+	defaultApplication string
 }
 
 // Start starts the SPOA to detect the security risks.
@@ -167,10 +168,10 @@ func logError(logger *zap.Logger) ErrorLogCallback {
 	}
 }
 
-// New creates a new SPOA instance.
-func New(conf map[string]*config.Application) (*SPOA, error) {
+// Create a new SPOA instance.
+func New(conf *config.Config) (*SPOA, error) {
 	apps := make(map[string]*application)
-	for name, cfg := range conf {
+	for name, cfg := range conf.Applications {
 		pe := zap.NewProductionEncoderConfig()
 
 		fileEncoder := zapcore.NewJSONEncoder(pe)
@@ -220,11 +221,12 @@ func New(conf map[string]*config.Application) (*SPOA, error) {
 				if err := tx.Close(); err != nil {
 					app.logger.Error("Failed to clean cache", zap.Error(err))
 				}
-			}).LFU().Expiration(time.Duration(cfg.TransactionTTL) * time.Second).Build()
+			}).LFU().Expiration(time.Millisecond * time.Duration(cfg.TransactionTTLMilliseconds)).Build()
 
 		apps[name] = app
 	}
 	return &SPOA{
-		applications: apps,
+		applications:       apps,
+		defaultApplication: conf.DefaultApplication,
 	}, nil
 }
