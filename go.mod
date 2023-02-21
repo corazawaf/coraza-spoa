@@ -17,7 +17,6 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
-	github.com/magefile/mage v1.14.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
