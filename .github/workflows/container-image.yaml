@@ -85,7 +85,7 @@ jobs:
         id: meta4
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/sts/coraza-spoa
+          images: ghcr.io/${{ github.repository }}
           flavor: |
             suffix=-crs4,onlatest=true
           tags: |
