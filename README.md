@@ -48,7 +48,7 @@ spoe-agent coraza-agent
     log global
 
 spoe-message coraza-req
-    args app=str(sample_app) id=unique-id src-ip=src method=method path=path query=query version=req.ver headers=req.hdrs bodyreq.body
+    args app=str(sample_app) id=unique-id src-ip=src method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
     event on-frontend-http-request
 
 spoe-message coraza-res
