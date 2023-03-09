@@ -39,22 +39,25 @@ Here is the configuration template to use for your SPOE with OWASP Coraza module
 ```editorconfig
 [coraza]
 spoe-agent coraza-agent
-    messages coraza-req coraza-res
-    option var-prefix coraza
-    timeout hello      100ms
-    timeout idle       2m
-    timeout processing 10ms
+    messages    coraza-req      coraza-res
+    option      var-prefix      coraza
+    option      set-on-error    error
+    timeout     hello           100ms
+    timeout     idle            2m
+    timeout     processing      500ms
     use-backend coraza-spoa
     log global
 
 spoe-message coraza-req
-    args app=str(sample_app) id=unique-id src-ip=src method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
+    args app=str(sample_app) id=unique-id src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
     event on-frontend-http-request
 
 spoe-message coraza-res
     args app=str(sample_app) id=unique-id version=res.ver status=status headers=res.hdrs body=res.body
     event on-http-response
 ```
+
+Instead of hard coded application name `str(sample_app)` you can use some HAProxy's variable. For example, frontend name `fe_name` or some custom variable.
 
 The engine is in the scope "coraza". So to enable it, you must set the following line in a frontend/listener section:
 
