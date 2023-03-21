@@ -24,7 +24,7 @@ FROM alpine:3.17 AS main
 
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.authors="OWASP Coraza Maintainers" \
+LABEL org.opencontainers.image.authors="The OWASP Coraza contributors" \
       org.opencontainers.image.description="OWASP Coraza WAF (Haproxy SPOA)" \
       org.opencontainers.image.documentation="https://coraza.io/connectors/coraza-spoa/" \
       org.opencontainers.image.licenses="Apache-2.0" \

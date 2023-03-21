@@ -57,7 +57,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker metadata - Main
-        id: meta1
+        id: meta-main
         uses: docker/metadata-action@v4
         with:
           images: ghcr.io/${{ github.repository }}
@@ -77,12 +77,12 @@ jobs:
           platforms: linux/amd64
           file: Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta1.outputs.tags }}
-          labels: ${{ steps.meta1.outputs.labels }}
+          tags: ${{ steps.meta-main.outputs.tags }}
+          labels: ${{ steps.meta-main.outputs.labels }}
 
 
       - name: Docker metadata - CRS4
-        id: meta4
+        id: meta-crs4
         uses: docker/metadata-action@v4
         with:
           images: ghcr.io/${{ github.repository }}
@@ -107,5 +107,5 @@ jobs:
           target: coreruleset
           build-args: |
             CORERULESET_VERSION=v4.0.0-rc1
-          tags: ${{ steps.meta4.outputs.tags }}
-          labels: ${{ steps.meta4.outputs.labels }}
+          tags: ${{ steps.meta-crs4.outputs.tags }}
+          labels: ${{ steps.meta-crs4.outputs.labels }}
