@@ -5,12 +5,12 @@ package internal
 
 import (
 	"fmt"
-	"net"
-	"time"
-
 	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
+	"net"
+	"strings"
+	"time"
 )
 
 func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
@@ -20,6 +20,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		path    = "/"
 		query   = ""
 		version = "1.1"
+		host    = ""
 		srcIP   net.IP
 		srcPort = 0
 		dstIP   net.IP
@@ -27,6 +28,37 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		tx      types.Transaction
 	)
 	var app *application
+
+	defer func() {
+		if tx == nil || tx.ID() == "" || app == nil {
+			return
+		}
+		if tx.IsInterrupted() {
+			if app.cfg.EnhancedLog {
+				for _, rule := range tx.MatchedRules() {
+					if rule.Message() == "" || rule.Rule().Severity() < 1 || rule.Rule().Severity() < 1 {
+						continue
+					}
+					s.enhancedLog(app, rule, host, method)
+				}
+			} else {
+				tx.ProcessLogging()
+			}
+
+			if err := tx.Close(); err != nil {
+				app.logger.Error("failed to close transaction", zap.String("transaction_id", tx.ID()), zap.String("error", err.Error()))
+			}
+		} else {
+			if app.cfg.NoResponseCheck {
+				return
+			}
+			err := app.cache.SetWithExpire(tx.ID(), tx, time.Millisecond*time.Duration(app.cfg.TransactionTTLMilliseconds))
+			if err != nil {
+				app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
+			}
+		}
+	}()
+
 	for msg.Args.Next() {
 		arg := msg.Args.Arg
 		if arg.Name != "app" && app == nil {
@@ -54,20 +86,6 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
 			tx = app.waf.NewTransactionWithID(id)
-			//tx.Variables.UniqueID.Set(tx.ID)
-			defer func() {
-				if tx.IsInterrupted() {
-					tx.ProcessLogging()
-					if err := tx.Close(); err != nil {
-						app.logger.Error("failed to close transaction", zap.String("transaction_id", id), zap.String("error", err.Error()))
-					}
-				} else {
-					err := app.cache.SetWithExpire(id, tx, time.Millisecond*time.Duration(app.cfg.TransactionTTLMilliseconds))
-					if err != nil {
-						app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
-					}
-				}
-			}()
 		case "src-ip":
 			srcIP, ok = arg.Value.(net.IP)
 			if !ok {
@@ -127,6 +145,9 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				for _, v := range values {
 					tx.AddRequestHeader(key, v)
 				}
+				if strings.ToLower(key) == "host" {
+					host = strings.Join(values, ",")
+				}
 			}
 		case "body":
 			body, ok := arg.Value.([]byte)
@@ -134,9 +155,12 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("invalid argument for http request body, []byte expected, got %v", arg.Value)
 			}
 
-			_, err := tx.RequestBodyWriter().Write(body)
+			it, _, err := tx.WriteRequestBody(body)
 			if err != nil {
 				return nil, err
+			}
+			if it != nil {
+				return s.processInterruption(it, hit), nil
 			}
 		default:
 			app.logger.Error("invalid message on the http frontend request", zap.String("name", arg.Name), zap.Any("value", arg.Value))
@@ -160,4 +184,20 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		return s.processInterruption(it, hit), nil
 	}
 	return s.message(miss), nil
+}
+
+func (s *SPOA) enhancedLog(app *application, rule types.MatchedRule, host string, method string) {
+	app.logger.Error("waf_intruder_alert",
+		zap.String("message", rule.Message()),
+		zap.Int("rule_id", rule.Rule().ID()),
+		zap.String("data", rule.Data()),
+		zap.String("client_ip", rule.ClientIPAddress()),
+		zap.String("host", host),
+		zap.String("method", method),
+		zap.String("uri", rule.URI()),
+		zap.String("transaction_id", rule.TransactionID()),
+		zap.String("file", rule.Rule().File()),
+		zap.Int("line", rule.Rule().Line()),
+		zap.Int("phase", int(rule.Rule().Phase())),
+	)
 }

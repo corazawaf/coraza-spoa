@@ -91,9 +91,12 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http response body, []byte expected, got %v", arg.Value)
 			}
-			_, err := tx.ResponseBodyWriter().Write(body)
+			it, _, err := tx.WriteRequestBody(body)
 			if err != nil {
 				return nil, err
+			}
+			if it != nil {
+				return s.processInterruption(it, hit), nil
 			}
 		default:
 			app.logger.Warn(fmt.Sprintf("invalid message on the http response, name: %s, value: %s", arg.Name, arg.Value))

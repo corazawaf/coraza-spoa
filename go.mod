@@ -1,18 +1,18 @@
-module github.com/corazawaf/coraza-spoa
+module coraza-spoa
 
-go 1.18
+go 1.19
 
 require (
 	github.com/bluele/gcache v0.0.2
-	github.com/corazawaf/coraza/v3 v3.0.0-20221228115202-64706480a6a6
+	github.com/corazawaf/coraza/v3 v3.0.0-rc.1.0.20230331084731-c04b1a72fd2c
 	github.com/criteo/haproxy-spoe-go v1.0.6
 	github.com/magefile/mage v1.14.0
-	go.uber.org/zap v1.21.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+	go.uber.org/zap v1.24.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
-	github.com/corazawaf/libinjection-go v0.1.1 // indirect
+	github.com/corazawaf/libinjection-go v0.1.2 // indirect
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20211021192214-5ab2d9280aa9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/sirupsen/logrus v1.7.0 // indirect
@@ -21,6 +21,7 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	rsc.io/binaryregexp v0.2.0 // indirect
 )

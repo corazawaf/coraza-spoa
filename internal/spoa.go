@@ -4,6 +4,7 @@
 package internal
 
 import (
+	"coraza-spoa/config"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,8 +17,6 @@ import (
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/corazawaf/coraza-spoa/config"
 )
 
 const (
@@ -97,13 +96,6 @@ func (s *SPOA) processInterruption(it *types.Interruption, code int) []spoe.Acti
 			Scope: spoe.VarScopeTransaction,
 			Value: it.RuleID,
 		},
-		// TODO - deprected, don't use this anymore.
-		//  will be removed in a future version.
-		spoe.ActionSetVar{
-			Name:  "fail",
-			Scope: spoe.VarScopeTransaction,
-			Value: code,
-		},
 	}
 }
 
@@ -168,7 +160,7 @@ func logError(logger *zap.Logger) ErrorLogCallback {
 	}
 }
 
-// Create a new SPOA instance.
+// New Create a new SPOA instance.
 func New(conf *config.Config) (*SPOA, error) {
 	apps := make(map[string]*application)
 	for name, cfg := range conf.Applications {
@@ -192,10 +184,13 @@ func New(conf *config.Config) (*SPOA, error) {
 
 		logger := zap.New(core)
 
-		conf := coraza.NewWAFConfig().
-			WithDirectives(strings.Join(cfg.Rules, "\n")).
-			WithErrorLogger(logError(logger))
-
+		conf := coraza.NewWAFConfig()
+		for _, rule := range cfg.Rules {
+			conf = conf.WithDirectivesFromFile(rule)
+		}
+		if !cfg.EnhancedLog {
+			conf = conf.WithErrorCallback(logError(logger))
+		}
 		waf, err := coraza.NewWAF(conf)
 		if err != nil {
 			logger.Error("unable to create waf instance", zap.String("app", name), zap.Error(err))
