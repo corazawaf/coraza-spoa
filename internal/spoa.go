@@ -184,13 +184,10 @@ func New(conf *config.Config) (*SPOA, error) {
 
 		logger := zap.New(core)
 
-		conf := coraza.NewWAFConfig()
-		for _, rule := range cfg.Rules {
-			conf = conf.WithDirectivesFromFile(rule)
-		}
-		if !cfg.EnhancedLog {
-			conf = conf.WithErrorCallback(logError(logger))
-		}
+		conf := coraza.NewWAFConfig().
+			WithDirectives(cfg.Directives).
+			WithErrorCallback(logError(logger))
+
 		waf, err := coraza.NewWAF(conf)
 		if err != nil {
 			logger.Error("unable to create waf instance", zap.String("app", name), zap.Error(err))

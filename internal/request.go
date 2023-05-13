@@ -5,12 +5,12 @@ package internal
 
 import (
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
-	"net"
-	"strings"
-	"time"
 )
 
 func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
@@ -20,7 +20,6 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		path    = "/"
 		query   = ""
 		version = "1.1"
-		host    = ""
 		srcIP   net.IP
 		srcPort = 0
 		dstIP   net.IP
@@ -34,17 +33,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 			return
 		}
 		if tx.IsInterrupted() {
-			if app.cfg.EnhancedLog {
-				for _, rule := range tx.MatchedRules() {
-					if rule.Message() == "" || rule.Rule().Severity() < 1 || rule.Rule().Severity() < 1 {
-						continue
-					}
-					s.enhancedLog(app, rule, host, method)
-				}
-			} else {
-				tx.ProcessLogging()
-			}
-
+			tx.ProcessLogging()
 			if err := tx.Close(); err != nil {
 				app.logger.Error("failed to close transaction", zap.String("transaction_id", tx.ID()), zap.String("error", err.Error()))
 			}
@@ -145,9 +134,6 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				for _, v := range values {
 					tx.AddRequestHeader(key, v)
 				}
-				if strings.ToLower(key) == "host" {
-					host = strings.Join(values, ",")
-				}
 			}
 		case "body":
 			body, ok := arg.Value.([]byte)
@@ -184,20 +170,4 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		return s.processInterruption(it, hit), nil
 	}
 	return s.message(miss), nil
-}
-
-func (s *SPOA) enhancedLog(app *application, rule types.MatchedRule, host string, method string) {
-	app.logger.Error("waf_intruder_alert",
-		zap.String("message", rule.Message()),
-		zap.Int("rule_id", rule.Rule().ID()),
-		zap.String("data", rule.Data()),
-		zap.String("client_ip", rule.ClientIPAddress()),
-		zap.String("host", host),
-		zap.String("method", method),
-		zap.String("uri", rule.URI()),
-		zap.String("transaction_id", rule.TransactionID()),
-		zap.String("file", rule.Rule().File()),
-		zap.Int("line", rule.Rule().Line()),
-		zap.Int("phase", int(rule.Rule().Phase())),
-	)
 }

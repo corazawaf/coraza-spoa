@@ -12,10 +12,10 @@ applications:
     #
     # Download the OWASP CRS from https://github.com/coreruleset/coreruleset/releases
     # and copy crs-setup.conf & the rules, plugins directories to /etc/coraza-spoa
-    rules:
-      - /etc/coraza-spoa/coraza.conf
-      - /etc/coraza-spoa/crs-setup.conf
-      - /etc/coraza-spoa/rules/*.conf
+    directives: |
+      Include /etc/coraza-spoa/coraza.conf
+      Include /etc/coraza-spoa/crs-setup.conf
+      Include /etc/coraza-spoa/rules/*.conf
 
     # HAProxy configured to send requests only, that means no cache required
     no_response_check: false
@@ -29,5 +29,3 @@ applications:
     log_level: info
     # The log file path
     log_file: /dev/stdout
-    # Use JSON enhanced audit logs (with host, method and other fields) on interrupted transaction
-    enhanced_log: false
