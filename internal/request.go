@@ -134,7 +134,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("invalid argument for http request body, []byte expected, got %v", arg.Value)
 			}
 
-			_, err := tx.RequestBodyWriter().Write(body)
+			_, _, err := tx.WriteRequestBody(body)
 			if err != nil {
 				return nil, err
 			}

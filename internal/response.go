@@ -91,7 +91,7 @@ func (s *SPOA) processResponse(msg spoe.Message) ([]spoe.Action, error) {
 			if !ok {
 				return nil, fmt.Errorf("invalid argument for http response body, []byte expected, got %v", arg.Value)
 			}
-			_, err := tx.ResponseBodyWriter().Write(body)
+			_, _, err := tx.WriteResponseBody(body)
 			if err != nil {
 				return nil, err
 			}

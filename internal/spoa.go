@@ -146,7 +146,7 @@ func (s *SPOA) cleanApplications() {
 
 func logError(logger *zap.Logger) ErrorLogCallback {
 	return func(mr types.MatchedRule) {
-		data := mr.ErrorLog(0)
+		data := mr.ErrorLog()
 		switch mr.Rule().Severity() {
 		case types.RuleSeverityEmergency:
 			logger.Error(data)
@@ -194,7 +194,7 @@ func New(conf *config.Config) (*SPOA, error) {
 
 		conf := coraza.NewWAFConfig().
 			WithDirectives(strings.Join(cfg.Rules, "\n")).
-			WithErrorLogger(logError(logger))
+			WithErrorCallback(logError(logger))
 
 		waf, err := coraza.NewWAF(conf)
 		if err != nil {
