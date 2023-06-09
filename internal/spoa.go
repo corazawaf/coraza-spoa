@@ -138,7 +138,7 @@ func (s *SPOA) cleanApplications() {
 
 func logError(logger *zap.Logger) ErrorLogCallback {
 	return func(mr types.MatchedRule) {
-		data := mr.ErrorLog(0)
+		data := mr.ErrorLog()
 		switch mr.Rule().Severity() {
 		case types.RuleSeverityEmergency:
 			logger.Error(data)
