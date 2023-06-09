@@ -229,3 +229,24 @@ func New(conf *config.Config) (*SPOA, error) {
 		defaultApplication: conf.DefaultApplication,
 	}, nil
 }
+
+func (s *SPOA) getApplication(appName string) (*application, error) {
+	var app *application
+
+	// Looking for app by name from message
+	if appName != "" {
+		app, exist := s.applications[appName]
+		if exist {
+			return app, nil
+		}
+	}
+
+	// Looking for app by default app name
+	app, exist := s.applications[s.defaultApplication]
+	if exist {
+		app.logger.Debug("application not found, using default", zap.Any("application", appName), zap.String("default", s.defaultApplication))
+		return app, nil
+	}
+
+	return nil, fmt.Errorf("application not found", zap.Any("application", appName), zap.String("default", s.defaultApplication))
+}
