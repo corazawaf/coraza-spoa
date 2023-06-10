@@ -4,7 +4,6 @@
 package internal
 
 import (
-	"coraza-spoa/config"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bluele/gcache"
+	"github.com/corazawaf/coraza-spoa/config"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
@@ -190,6 +190,7 @@ func New(conf *config.Config) (*SPOA, error) {
 
 		if len(cfg.Rules) > 0 {
 			// Deprecated: this will soon be removed
+			logger.Warn("'rules' directive in configuration is deprecated and will be removed soon, use 'directives' instead")
 			conf = conf.WithDirectives(strings.Join(cfg.Rules, "\n"))
 		}
 

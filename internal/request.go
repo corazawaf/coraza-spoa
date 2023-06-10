@@ -29,7 +29,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 	var app *application
 
 	defer func() {
-		if tx == nil || tx.ID() == "" || app == nil {
+		if tx == nil || app == nil {
 			return
 		}
 		if tx.IsInterrupted() {

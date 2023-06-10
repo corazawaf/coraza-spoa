@@ -1,4 +1,4 @@
-module coraza-spoa
+module github.com/corazawaf/coraza-spoa
 
 go 1.19
 

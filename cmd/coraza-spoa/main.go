@@ -4,9 +4,10 @@
 package main
 
 import (
-	"coraza-spoa/config"
-	"coraza-spoa/internal"
 	"flag"
+
+	"github.com/corazawaf/coraza-spoa/config"
+	"github.com/corazawaf/coraza-spoa/internal"
 )
 
 func main() {
