@@ -18,6 +18,7 @@ import (
 )
 
 var addLicenseVersion = "v1.0.0" // https://github.com/google/addlicense
+// TODO: Use recent version (for example v1.53.2) to run on Go 1.20 (https://github.com/golangci/golangci-lint/pull/3414)
 var golangCILintVer = "v1.48.0"  // https://github.com/golangci/golangci-lint/releases
 var gosImportsVer = "v0.1.5"     // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
 

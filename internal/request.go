@@ -27,6 +27,27 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		tx      types.Transaction
 	)
 	var app *application
+
+	defer func() {
+		if tx == nil || app == nil {
+			return
+		}
+		if tx.IsInterrupted() {
+			tx.ProcessLogging()
+			if err := tx.Close(); err != nil {
+				app.logger.Error("failed to close transaction", zap.String("transaction_id", tx.ID()), zap.String("error", err.Error()))
+			}
+		} else {
+			if app.cfg.NoResponseCheck {
+				return
+			}
+			err := app.cache.SetWithExpire(tx.ID(), tx, time.Millisecond*time.Duration(app.cfg.TransactionTTLMilliseconds))
+			if err != nil {
+				app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
+			}
+		}
+	}()
+
 	for msg.Args.Next() {
 		arg := msg.Args.Arg
 		if arg.Name != "app" && app == nil {
@@ -54,20 +75,6 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("invalid argument for http request id, string expected, got %v", arg.Value)
 			}
 			tx = app.waf.NewTransactionWithID(id)
-			//tx.Variables.UniqueID.Set(tx.ID)
-			defer func() {
-				if tx.IsInterrupted() {
-					tx.ProcessLogging()
-					if err := tx.Close(); err != nil {
-						app.logger.Error("failed to close transaction", zap.String("transaction_id", id), zap.String("error", err.Error()))
-					}
-				} else {
-					err := app.cache.SetWithExpire(id, tx, time.Millisecond*time.Duration(app.cfg.TransactionTTLMilliseconds))
-					if err != nil {
-						app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
-					}
-				}
-			}()
 		case "src-ip":
 			srcIP, ok = arg.Value.(net.IP)
 			if !ok {
@@ -134,9 +141,12 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 				return nil, fmt.Errorf("invalid argument for http request body, []byte expected, got %v", arg.Value)
 			}
 
-			_, err := tx.RequestBodyWriter().Write(body)
+			it, _, err := tx.WriteRequestBody(body)
 			if err != nil {
 				return nil, err
+			}
+			if it != nil {
+				return s.processInterruption(it, hit), nil
 			}
 		default:
 			app.logger.Error("invalid message on the http frontend request", zap.String("name", arg.Name), zap.Any("value", arg.Value))

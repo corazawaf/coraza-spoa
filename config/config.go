@@ -22,8 +22,11 @@ type Config struct {
 
 // Application is used to manage the haproxy configuration and waf rules.
 type Application struct {
-	LogLevel                   string   `yaml:"log_level"`
-	LogFile                    string   `yaml:"log_file"`
+	LogLevel        string `yaml:"log_level"`
+	LogFile         string `yaml:"log_file"`
+	NoResponseCheck bool   `yaml:"no_response_check"`
+	Directives      string `yaml:"directives"`
+	// Deprecated: use directives instead, this will be removed in the near future.
 	Rules                      []string `yaml:"rules"`
 	TransactionTTLMilliseconds int      `yaml:"transaction_ttl_ms"`
 	TransactionActiveLimit     int      `yaml:"transaction_active_limit"`

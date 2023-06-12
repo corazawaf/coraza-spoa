@@ -11,13 +11,12 @@ import (
 	"time"
 
 	"github.com/bluele/gcache"
+	"github.com/corazawaf/coraza-spoa/config"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 	spoe "github.com/criteo/haproxy-spoe-go"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/corazawaf/coraza-spoa/config"
 )
 
 const (
@@ -97,13 +96,6 @@ func (s *SPOA) processInterruption(it *types.Interruption, code int) []spoe.Acti
 			Scope: spoe.VarScopeTransaction,
 			Value: it.RuleID,
 		},
-		// TODO - deprected, don't use this anymore.
-		//  will be removed in a future version.
-		spoe.ActionSetVar{
-			Name:  "fail",
-			Scope: spoe.VarScopeTransaction,
-			Value: code,
-		},
 	}
 }
 
@@ -146,7 +138,7 @@ func (s *SPOA) cleanApplications() {
 
 func logError(logger *zap.Logger) ErrorLogCallback {
 	return func(mr types.MatchedRule) {
-		data := mr.ErrorLog(0)
+		data := mr.ErrorLog()
 		switch mr.Rule().Severity() {
 		case types.RuleSeverityEmergency:
 			logger.Error(data)
@@ -168,7 +160,7 @@ func logError(logger *zap.Logger) ErrorLogCallback {
 	}
 }
 
-// Create a new SPOA instance.
+// New Create a new SPOA instance.
 func New(conf *config.Config) (*SPOA, error) {
 	apps := make(map[string]*application)
 	for name, cfg := range conf.Applications {
@@ -193,8 +185,15 @@ func New(conf *config.Config) (*SPOA, error) {
 		logger := zap.New(core)
 
 		conf := coraza.NewWAFConfig().
-			WithDirectives(strings.Join(cfg.Rules, "\n")).
-			WithErrorLogger(logError(logger))
+			WithDirectives(cfg.Directives).
+			WithErrorCallback(logError(logger))
+
+		//nolint:staticcheck // https://github.com/golangci/golangci-lint/issues/741
+		if len(cfg.Rules) > 0 {
+			// Deprecated: this will soon be removed
+			logger.Warn("'rules' directive in configuration is deprecated and will be removed soon, use 'directives' instead")
+			conf = conf.WithDirectives(strings.Join(cfg.Rules, "\n"))
+		}
 
 		waf, err := coraza.NewWAF(conf)
 		if err != nil {
