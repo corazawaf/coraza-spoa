@@ -188,6 +188,7 @@ func New(conf *config.Config) (*SPOA, error) {
 			WithDirectives(cfg.Directives).
 			WithErrorCallback(logError(logger))
 
+		//nolint:staticcheck // https://github.com/golangci/golangci-lint/issues/741
 		if len(cfg.Rules) > 0 {
 			// Deprecated: this will soon be removed
 			logger.Warn("'rules' directive in configuration is deprecated and will be removed soon, use 'directives' instead")
