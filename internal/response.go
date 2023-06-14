@@ -96,7 +96,7 @@ func (s *SPOA) processResponse(spoeMsg spoe.Message) ([]spoe.Action, error) {
 		}
 	}
 
-	it, _, err := tx.WriteRequestBody(resp.body)
+	it, _, err := tx.WriteResponseBody(resp.body)
 	if err != nil {
 		return nil, err
 	}
