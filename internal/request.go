@@ -13,19 +13,93 @@ import (
 	"go.uber.org/zap"
 )
 
-func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
+type request struct {
+	app     string
+	id      string
+	srcIp   net.IP
+	srcPort int
+	dstIp   net.IP
+	dstPort int
+	method  string
+	path    string
+	query   string
+	version string
+	headers string
+	body    []byte
+}
+
+func NewRequest(msg message) (*request, error) {
+	req := request{}
+	var err error
+
+	req.app, err = msg.App()
+	if err != nil {
+		return nil, err
+	}
+
+	req.id, err = msg.Id()
+	if err != nil {
+		return nil, err
+	}
+
+	req.srcIp, err = msg.SrcIp()
+	if err != nil {
+		return nil, err
+	}
+
+	req.srcPort, err = msg.SrcPort()
+	if err != nil {
+		return nil, err
+	}
+
+	req.dstIp, err = msg.DstIp()
+	if err != nil {
+		return nil, err
+	}
+
+	req.dstPort, err = msg.DstPort()
+	if err != nil {
+		return nil, err
+	}
+
+	req.method, err = msg.Method()
+	if err != nil {
+		return nil, err
+	}
+
+	req.path, err = msg.Path()
+	if err != nil {
+		fmt.Println(err.Error())
+		req.path = "/"
+	}
+
+	req.query, err = msg.Query()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	req.version, err = msg.Version()
+	if err != nil {
+		fmt.Println(err.Error())
+		req.version = "1.1"
+	}
+
+	req.headers, err = msg.Headers()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
+	req.body, err = msg.Body()
+
+	return &req, nil
+}
+
+func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
 	var (
-		app     *application
-		id      = ""
-		method  = ""
-		path    = "/"
-		query   = ""
-		version = "1.1"
-		srcIP   net.IP
-		srcPort = 0
-		dstIP   net.IP
-		dstPort = 0
-		tx      types.Transaction
+		err error
+		req *request
+		app *application
+		tx  types.Transaction
 	)
 
 	defer func() {
@@ -48,66 +122,20 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		}
 	}()
 
-	args := msg.Args.Map()
-	var err error
-
-	appName, _ := getAppName(args)
-	app, err = s.getApplication(appName)
+	msg := NewMessage(spoeMsg)
+	req, err = NewRequest(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err = getId(args)
-	if err != nil {
-		return nil, err
-	}
-	tx = app.waf.NewTransactionWithID(id)
-
-	srcIP, _ = getSourceIp(args)
+	app, err = s.getApplication(req.app)
 	if err != nil {
 		return nil, err
 	}
 
-	srcPort, _ = getSourcePort(args)
-	if err != nil {
-		return nil, err
-	}
+	tx = app.waf.NewTransactionWithID(req.id)
 
-	dstIP, _ = getDestinationIp(args)
-	if err != nil {
-		return nil, err
-	}
-
-	dstPort, _ = getDestinationPort(args)
-	if err != nil {
-		return nil, err
-	}
-
-	method, _ = getMethod(args)
-	if err != nil {
-		return nil, err
-	}
-
-	path, err = getPath(args)
-	if err != nil {
-		app.logger.Error(err.Error())
-	}
-
-	query, _ = getQuery(args)
-	if err != nil {
-		app.logger.Error(err.Error())
-	}
-
-	version, err = getVersion(args)
-	if err != nil {
-		app.logger.Error(err.Error())
-	}
-
-	headersString, err := getHeaders(args)
-	if err != nil {
-		app.logger.Error(err.Error())
-	}
-	headers, err := s.readHeaders(headersString)
+	headers, err := s.readHeaders(req.headers)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +145,7 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		}
 	}
 
-	body, _ := getBody(args)
-	it, _, err := tx.WriteRequestBody(body)
+	it, _, err := tx.WriteRequestBody(req.body)
 	if err != nil {
 		return nil, err
 	}
@@ -126,13 +153,11 @@ func (s *SPOA) processRequest(msg spoe.Message) ([]spoe.Action, error) {
 		return s.processInterruption(it, hit), nil
 	}
 
-	app.logger.Debug(fmt.Sprintf("ProcessConnection: %s:%d -> %s:%d", srcIP.String(), srcPort, dstIP.String(), dstPort))
-	tx.ProcessConnection(srcIP.String(), srcPort, dstIP.String(), dstPort)
+	tx.ProcessConnection(string(req.srcIp), req.srcPort, string(req.dstIp), req.dstPort)
+	tx.ProcessURI(req.path+"?"+req.query, req.method, "HTTP/"+req.version)
 
-	app.logger.Debug(fmt.Sprintf("ProcessURI: %s %s?%s %s", method, path, query, "HTTP/"+version))
-	tx.ProcessURI(path+"?"+query, method, "HTTP/"+version)
-
-	if it := tx.ProcessRequestHeaders(); it != nil {
+	it = tx.ProcessRequestHeaders()
+	if it != nil {
 		return s.processInterruption(it, hit), nil
 	}
 

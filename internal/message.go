@@ -6,10 +6,22 @@ package internal
 import (
 	"fmt"
 	"net"
+
+	spoe "github.com/criteo/haproxy-spoe-go"
 )
 
-func getAppName(args map[string]interface{}) (string, error) {
-	appArgVal, exist := args["app"]
+type message struct {
+	args map[string]interface{}
+}
+
+func NewMessage(spmsg spoe.Message) message {
+	return message{
+		args: spmsg.Args.Map(),
+	}
+}
+
+func (msg message) App() (string, error) {
+	appArgVal, exist := msg.args["app"]
 	if exist && appArgVal != nil {
 		id, ok := appArgVal.(string)
 		if ok {
@@ -20,8 +32,8 @@ func getAppName(args map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("invalid argument for application name, string expected, got %v", appArgVal)
 }
 
-func getId(args map[string]interface{}) (string, error) {
-	idArgVal, exist := args["id"]
+func (msg message) Id() (string, error) {
+	idArgVal, exist := msg.args["id"]
 	if exist && idArgVal != nil {
 		id, ok := idArgVal.(string)
 		if ok {
@@ -32,8 +44,8 @@ func getId(args map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("invalid argument for id, string expected, got %v", idArgVal)
 }
 
-func getSourceIp(args map[string]interface{}) (net.IP, error) {
-	srcIpArgVal, exist := args["src-ip"]
+func (msg message) SrcIp() (net.IP, error) {
+	srcIpArgVal, exist := msg.args["src-ip"]
 	if exist && srcIpArgVal != nil {
 		srcIp, ok := srcIpArgVal.(net.IP)
 		if ok {
@@ -44,8 +56,8 @@ func getSourceIp(args map[string]interface{}) (net.IP, error) {
 	return nil, fmt.Errorf("invalid argument for src ip, net.IP expected, got %v", srcIpArgVal)
 }
 
-func getSourcePort(args map[string]interface{}) (int, error) {
-	srcPortArgVal, exist := args["src-port"]
+func (msg message) SrcPort() (int, error) {
+	srcPortArgVal, exist := msg.args["src-port"]
 	if exist && srcPortArgVal != nil {
 		srcPort, ok := srcPortArgVal.(int)
 		if ok {
@@ -56,8 +68,8 @@ func getSourcePort(args map[string]interface{}) (int, error) {
 	return 0, fmt.Errorf("invalid argument for src port, integer expected, got %v", srcPortArgVal)
 }
 
-func getDestinationIp(args map[string]interface{}) (net.IP, error) {
-	dstIpArgVal, exist := args["dst-ip"]
+func (msg message) DstIp() (net.IP, error) {
+	dstIpArgVal, exist := msg.args["dst-ip"]
 	if exist && dstIpArgVal != nil {
 		dstIp, ok := dstIpArgVal.(net.IP)
 		if ok {
@@ -68,8 +80,8 @@ func getDestinationIp(args map[string]interface{}) (net.IP, error) {
 	return nil, fmt.Errorf("invalid argument for dst ip, net.IP expected, got %v", dstIpArgVal)
 }
 
-func getDestinationPort(args map[string]interface{}) (int, error) {
-	dstPortArgVal, exist := args["dst-port"]
+func (msg message) DstPort() (int, error) {
+	dstPortArgVal, exist := msg.args["dst-port"]
 	if exist && dstPortArgVal != nil {
 		dstPort, ok := dstPortArgVal.(int)
 		if ok {
@@ -80,8 +92,8 @@ func getDestinationPort(args map[string]interface{}) (int, error) {
 	return 0, fmt.Errorf("invalid argument for dst port, integer expected, got %v", dstPortArgVal)
 }
 
-func getMethod(args map[string]interface{}) (string, error) {
-	methodArgVal, exist := args["method"]
+func (msg message) Method() (string, error) {
+	methodArgVal, exist := msg.args["method"]
 	if exist && methodArgVal != nil {
 		method, ok := methodArgVal.(string)
 		if ok {
@@ -92,8 +104,8 @@ func getMethod(args map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("invalid argument for http method, string expected, got %v", methodArgVal)
 }
 
-func getPath(args map[string]interface{}) (string, error) {
-	pathArgVal, exist := args["path"]
+func (msg message) Path() (string, error) {
+	pathArgVal, exist := msg.args["path"]
 	if exist && pathArgVal != nil {
 		path, ok := pathArgVal.(string)
 		if ok {
@@ -104,8 +116,8 @@ func getPath(args map[string]interface{}) (string, error) {
 	return "/", fmt.Errorf("invalid argument for http path, string expected, got %v", pathArgVal)
 }
 
-func getQuery(args map[string]interface{}) (string, error) {
-	queryArgVal, exist := args["query"]
+func (msg message) Query() (string, error) {
+	queryArgVal, exist := msg.args["query"]
 	if exist && queryArgVal != nil {
 		query, ok := queryArgVal.(string)
 		if ok {
@@ -116,8 +128,8 @@ func getQuery(args map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("invalid argument for http query, string expected, got %v", queryArgVal)
 }
 
-func getVersion(args map[string]interface{}) (string, error) {
-	versionArgVal, exist := args["version"]
+func (msg message) Version() (string, error) {
+	versionArgVal, exist := msg.args["version"]
 	if exist && versionArgVal != nil {
 		version, ok := versionArgVal.(string)
 		if ok {
@@ -128,8 +140,8 @@ func getVersion(args map[string]interface{}) (string, error) {
 	return "1.1", fmt.Errorf("invalid argument for http version, string expected, got %v", versionArgVal)
 }
 
-func getHeaders(args map[string]interface{}) (string, error) {
-	headersArgVal, exist := args["headers"]
+func (msg message) Headers() (string, error) {
+	headersArgVal, exist := msg.args["headers"]
 	if exist && headersArgVal != nil {
 		headers, ok := headersArgVal.(string)
 		if ok {
@@ -140,8 +152,8 @@ func getHeaders(args map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("invalid argument for http headers, string expected, got %v", headersArgVal)
 }
 
-func getBody(args map[string]interface{}) ([]byte, error) {
-	bodyArgVal, exist := args["body"]
+func (msg message) Body() ([]byte, error) {
+	bodyArgVal, exist := msg.args["body"]
 	if exist && bodyArgVal != nil {
 		body, ok := bodyArgVal.([]byte)
 		if ok {
@@ -152,8 +164,8 @@ func getBody(args map[string]interface{}) ([]byte, error) {
 	return nil, fmt.Errorf("invalid argument for http body, []byte expected, got %v", bodyArgVal)
 }
 
-func getStatus(args map[string]interface{}) (int, error) {
-	statusArgVal, exist := args["status"]
+func (msg message) Status() (int, error) {
+	statusArgVal, exist := msg.args["status"]
 	if exist && statusArgVal != nil {
 		dstPort, ok := statusArgVal.(int)
 		if ok {
