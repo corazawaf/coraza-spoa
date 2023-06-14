@@ -248,7 +248,7 @@ func (s *SPOA) getApplication(appName string) (*application, error) {
 		return app, nil
 	}
 
-	return nil, fmt.Errorf("application not found", zap.Any("application", appName), zap.String("default", s.defaultApplication))
+	return nil, fmt.Errorf("application not found, application %s, default: %s", appName, s.defaultApplication)
 }
 
 func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
@@ -353,11 +353,11 @@ func (s *SPOA) processResponse(spoeMsg spoe.Message) ([]spoe.Action, error) {
 
 	txInterface, err := app.cache.Get(resp.id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction from cache", zap.String("transaction_id", resp.id), zap.String("error", err.Error()), zap.String("app", app.name))
+		return nil, fmt.Errorf("failed to get transaction from cache, transaction_id: %s, app: %s, error: %s", resp.id, app.name, err.Error())
 	}
 	tx, ok := txInterface.(types.Transaction)
 	if !ok {
-		return nil, fmt.Errorf("application cache is corrupted", zap.String("transaction_id", resp.id), zap.String("app", app.name))
+		return nil, fmt.Errorf("application cache is corrupted, transaction_id: %s, app: %s", resp.id, app.name)
 	}
 
 	headers, err := s.readHeaders(resp.headers)

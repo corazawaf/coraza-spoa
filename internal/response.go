@@ -46,7 +46,7 @@ func NewResponse(msg message) (*response, error) {
 		fmt.Println(err.Error())
 	}
 
-	resp.body, err = msg.Body()
+	resp.body, _ = msg.Body()
 
 	return &resp, nil
 }

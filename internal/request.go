@@ -84,7 +84,7 @@ func NewRequest(msg message) (*request, error) {
 		fmt.Println(err.Error())
 	}
 
-	req.body, err = msg.Body()
+	req.body, _ = msg.Body()
 
 	return &req, nil
 }
