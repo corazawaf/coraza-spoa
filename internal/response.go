@@ -33,7 +33,6 @@ func NewResponse(msg message) (*response, error) {
 	resp.version, err = msg.Version()
 	if err != nil {
 		fmt.Println(err.Error())
-		resp.version = "1.1"
 	}
 
 	resp.status, err = msg.Status()

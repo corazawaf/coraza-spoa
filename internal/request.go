@@ -65,7 +65,6 @@ func NewRequest(msg message) (*request, error) {
 	req.path, err = msg.Path()
 	if err != nil {
 		fmt.Println(err.Error())
-		req.path = "/"
 	}
 
 	req.query, err = msg.Query()
@@ -76,7 +75,6 @@ func NewRequest(msg message) (*request, error) {
 	req.version, err = msg.Version()
 	if err != nil {
 		fmt.Println(err.Error())
-		req.version = "1.1"
 	}
 
 	req.headers, err = msg.Headers()
