@@ -250,3 +250,146 @@ func (s *SPOA) getApplication(appName string) (*application, error) {
 
 	return nil, fmt.Errorf("application not found", zap.Any("application", appName), zap.String("default", s.defaultApplication))
 }
+
+func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
+	var (
+		err error
+		req *request
+		app *application
+		tx  types.Transaction
+	)
+
+	defer func() {
+		if tx == nil || app == nil {
+			return
+		}
+		if tx.IsInterrupted() {
+			tx.ProcessLogging()
+			if err := tx.Close(); err != nil {
+				app.logger.Error("failed to close transaction", zap.String("transaction_id", tx.ID()), zap.String("error", err.Error()))
+			}
+		} else {
+			if app.cfg.NoResponseCheck {
+				return
+			}
+			err := app.cache.SetWithExpire(tx.ID(), tx, time.Millisecond*time.Duration(app.cfg.TransactionTTLMilliseconds))
+			if err != nil {
+				app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
+			}
+		}
+	}()
+
+	msg := NewMessage(spoeMsg)
+	req, err = NewRequest(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	app, err = s.getApplication(req.app)
+	if err != nil {
+		return nil, err
+	}
+
+	tx = app.waf.NewTransactionWithID(req.id)
+
+	headers, err := s.readHeaders(req.headers)
+	if err != nil {
+		return nil, err
+	}
+	for key, values := range headers {
+		for _, v := range values {
+			tx.AddRequestHeader(key, v)
+		}
+	}
+
+	it, _, err := tx.WriteRequestBody(req.body)
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	tx.ProcessConnection(string(req.srcIp), req.srcPort, string(req.dstIp), req.dstPort)
+	tx.ProcessURI(req.path+"?"+req.query, req.method, "HTTP/"+req.version)
+
+	it = tx.ProcessRequestHeaders()
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	it, err = tx.ProcessRequestBody()
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	return s.message(miss), nil
+}
+
+func (s *SPOA) processResponse(spoeMsg spoe.Message) ([]spoe.Action, error) {
+	var (
+		err  error
+		resp *response
+		app  *application
+		tx   types.Transaction
+	)
+	defer func() {
+		app.cache.Remove(resp.id)
+	}()
+
+	msg := NewMessage(spoeMsg)
+	resp, err = NewResponse(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	app, err = s.getApplication(resp.app)
+	if err != nil {
+		return nil, err
+	}
+
+	txInterface, err := app.cache.Get(resp.id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction from cache", zap.String("transaction_id", resp.id), zap.String("error", err.Error()), zap.String("app", app.name))
+	}
+	tx, ok := txInterface.(types.Transaction)
+	if !ok {
+		return nil, fmt.Errorf("application cache is corrupted", zap.String("transaction_id", resp.id), zap.String("app", app.name))
+	}
+
+	headers, err := s.readHeaders(resp.headers)
+	if err != nil {
+		return nil, err
+	}
+	for key, values := range headers {
+		for _, v := range values {
+			tx.AddResponseHeader(key, v)
+		}
+	}
+
+	it, _, err := tx.WriteResponseBody(resp.body)
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	it = tx.ProcessResponseHeaders(resp.status, "HTTP/"+resp.version)
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	it, err = tx.ProcessResponseBody()
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	return s.message(miss), nil
+}
