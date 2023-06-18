@@ -290,6 +290,10 @@ func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
 	}
 
 	tx = app.waf.NewTransactionWithID(req.id)
+	if tx.IsRuleEngineOff() {
+		app.logger.Warn("Rule engine is Off, Coraza is not going to process any rule")
+		return s.message(miss), nil
+	}
 
 	headers, err := s.readHeaders(req.headers)
 	if err != nil {
