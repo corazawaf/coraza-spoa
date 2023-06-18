@@ -5,6 +5,8 @@ package internal
 
 import (
 	"fmt"
+
+	spoe "github.com/criteo/haproxy-spoe-go"
 )
 
 type response struct {
@@ -16,36 +18,37 @@ type response struct {
 	body    []byte
 }
 
-func NewResponse(msg message) (*response, error) {
+func NewResponse(msg spoe.Message) (*response, error) {
+	args := msg.Args.Map()
 	resp := response{}
 	var err error
 
-	resp.app, err = msg.App()
+	resp.app, err = getString(args, "app")
 	if err != nil {
 		return nil, err
 	}
 
-	resp.id, err = msg.Id()
+	resp.id, err = getString(args, "id")
 	if err != nil {
 		return nil, err
 	}
 
-	resp.version, err = msg.Version()
+	resp.version, err = getString(args, "version")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	resp.status, err = msg.Status()
+	resp.status, err = getInt(args, "status")
 	if err != nil {
 		return nil, err
 	}
 
-	resp.headers, err = msg.Headers()
+	resp.headers, err = getString(args, "headers")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	resp.body, _ = msg.Body()
+	resp.body, _ = getByteArray(args, "body")
 
 	return &resp, nil
 }

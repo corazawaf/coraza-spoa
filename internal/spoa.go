@@ -279,8 +279,7 @@ func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
 		}
 	}()
 
-	msg := NewMessage(spoeMsg)
-	req, err = NewRequest(msg)
+	req, err = NewRequest(spoeMsg)
 	if err != nil {
 		return nil, err
 	}
@@ -340,8 +339,7 @@ func (s *SPOA) processResponse(spoeMsg spoe.Message) ([]spoe.Action, error) {
 		app.cache.Remove(resp.id)
 	}()
 
-	msg := NewMessage(spoeMsg)
-	resp, err = NewResponse(msg)
+	resp, err = NewResponse(spoeMsg)
 	if err != nil {
 		return nil, err
 	}
