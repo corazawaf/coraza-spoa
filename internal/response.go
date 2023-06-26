@@ -10,6 +10,7 @@ import (
 )
 
 type response struct {
+	msg     *message
 	app     string
 	id      string
 	version string
@@ -18,37 +19,47 @@ type response struct {
 	body    []byte
 }
 
-func NewResponse(msg spoe.Message) (*response, error) {
-	args := msg.Args.Map()
-	resp := response{}
+func NewResponse(spoeMsg *spoe.Message) (*response, error) {
+	msg, err := NewMessage(spoeMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	response := response{}
+	response.msg = msg
+
+	response.app, err = msg.getStringArg("app")
+	if err != nil {
+		return nil, err
+	}
+
+	response.id, err = response.msg.getStringArg("id")
+	if err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (resp *response) init() error {
 	var err error
 
-	resp.app, err = getString(args, "app")
-	if err != nil {
-		return nil, err
-	}
-
-	resp.id, err = getString(args, "id")
-	if err != nil {
-		return nil, err
-	}
-
-	resp.version, err = getString(args, "version")
+	resp.version, err = resp.msg.getStringArg("version")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	resp.status, err = getInt(args, "status")
+	resp.status, err = resp.msg.getIntArg("status")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	resp.headers, err = getString(args, "headers")
+	resp.headers, err = resp.msg.getStringArg("headers")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	resp.body, _ = getByteArray(args, "body")
+	resp.body, _ = resp.msg.getByteArrayArg("body")
 
-	return &resp, nil
+	return nil
 }

@@ -53,9 +53,9 @@ func (s *SPOA) Start(bind string) error {
 
 			switch msg.Name {
 			case "coraza-req":
-				return s.processRequest(msg)
+				return s.processRequest(&msg)
 			case "coraza-res":
-				return s.processResponse(msg)
+				return s.processResponse(&msg)
 			}
 		}
 		return nil, nil
@@ -251,7 +251,7 @@ func (s *SPOA) getApplication(appName string) (*application, error) {
 	return nil, fmt.Errorf("application not found, application %s, default: %s", appName, s.defaultApplication)
 }
 
-func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
+func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 	var (
 		err error
 		req *request
@@ -295,6 +295,11 @@ func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
 		return s.message(miss), nil
 	}
 
+	req.init()
+	if err != nil {
+		return nil, err
+	}
+
 	headers, err := s.readHeaders(req.headers)
 	if err != nil {
 		return nil, err
@@ -332,7 +337,7 @@ func (s *SPOA) processRequest(spoeMsg spoe.Message) ([]spoe.Action, error) {
 	return s.message(miss), nil
 }
 
-func (s *SPOA) processResponse(spoeMsg spoe.Message) ([]spoe.Action, error) {
+func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 	var (
 		err  error
 		resp *response
@@ -360,6 +365,11 @@ func (s *SPOA) processResponse(spoeMsg spoe.Message) ([]spoe.Action, error) {
 	tx, ok := txInterface.(types.Transaction)
 	if !ok {
 		return nil, fmt.Errorf("application cache is corrupted, transaction_id: %s, app: %s", resp.id, app.name)
+	}
+
+	resp.init()
+	if err != nil {
+		return nil, err
 	}
 
 	headers, err := s.readHeaders(resp.headers)

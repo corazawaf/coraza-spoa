@@ -11,6 +11,7 @@ import (
 )
 
 type request struct {
+	msg     *message
 	app     string
 	id      string
 	srcIp   net.IP
@@ -25,67 +26,77 @@ type request struct {
 	body    []byte
 }
 
-func NewRequest(msg spoe.Message) (*request, error) {
-	args := msg.Args.Map()
-	req := request{}
+func NewRequest(spoeMsg *spoe.Message) (*request, error) {
+	msg, err := NewMessage(spoeMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	request := request{}
+	request.msg = msg
+
+	request.app, err = msg.getStringArg("app")
+	if err != nil {
+		return nil, err
+	}
+
+	request.id, err = request.msg.getStringArg("id")
+	if err != nil {
+		return nil, err
+	}
+
+	return &request, nil
+}
+
+func (req *request) init() error {
 	var err error
 
-	req.app, err = getString(args, "app")
+	req.srcIp, err = req.msg.getIpArg("src-ip")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	req.id, err = getString(args, "id")
+	req.srcPort, err = req.msg.getIntArg("src-port")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	req.srcIp, err = getIp(args, "src-ip")
+	req.dstIp, err = req.msg.getIpArg("dst-ip")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	req.srcPort, err = getInt(args, "src-port")
+	req.dstPort, err = req.msg.getIntArg("dst-port")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	req.dstIp, err = getIp(args, "dst-ip")
+	req.method, err = req.msg.getStringArg("method")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	req.dstPort, err = getInt(args, "dst-port")
-	if err != nil {
-		return nil, err
-	}
-
-	req.method, err = getString(args, "method")
-	if err != nil {
-		return nil, err
-	}
-
-	req.path, err = getString(args, "path")
+	req.path, err = req.msg.getStringArg("path")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	req.query, err = getString(args, "query")
+	req.query, err = req.msg.getStringArg("query")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	req.version, err = getString(args, "version")
+	req.version, err = req.msg.getStringArg("version")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	req.headers, err = getString(args, "headers")
+	req.headers, err = req.msg.getStringArg("headers")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 
-	req.body, _ = getByteArray(args, "body")
+	req.body, _ = req.msg.getByteArrayArg("body")
 
-	return &req, nil
+	return nil
 }
