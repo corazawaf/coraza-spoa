@@ -53,9 +53,9 @@ func (s *SPOA) Start(bind string) error {
 
 			switch msg.Name {
 			case "coraza-req":
-				return s.processRequest(msg)
+				return s.processRequest(&msg)
 			case "coraza-res":
-				return s.processResponse(msg)
+				return s.processResponse(&msg)
 			}
 		}
 		return nil, nil
@@ -228,4 +228,180 @@ func New(conf *config.Config) (*SPOA, error) {
 		applications:       apps,
 		defaultApplication: conf.DefaultApplication,
 	}, nil
+}
+
+func (s *SPOA) getApplication(appName string) (*application, error) {
+	var app *application
+
+	// Looking for app by name from message
+	if appName != "" {
+		app, exist := s.applications[appName]
+		if exist {
+			return app, nil
+		}
+	}
+
+	// Looking for app by default app name
+	app, exist := s.applications[s.defaultApplication]
+	if exist {
+		app.logger.Debug("application not found, using default", zap.Any("application", appName), zap.String("default", s.defaultApplication))
+		return app, nil
+	}
+
+	return nil, fmt.Errorf("application not found, application %s, default: %s", appName, s.defaultApplication)
+}
+
+func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
+	var (
+		err error
+		req *request
+		app *application
+		tx  types.Transaction
+	)
+
+	defer func() {
+		if tx == nil || app == nil {
+			return
+		}
+		if tx.IsInterrupted() {
+			tx.ProcessLogging()
+			if err := tx.Close(); err != nil {
+				app.logger.Error("failed to close transaction", zap.String("transaction_id", tx.ID()), zap.String("error", err.Error()))
+			}
+		} else {
+			if app.cfg.NoResponseCheck {
+				return
+			}
+			err := app.cache.SetWithExpire(tx.ID(), tx, time.Millisecond*time.Duration(app.cfg.TransactionTTLMilliseconds))
+			if err != nil {
+				app.logger.Error(fmt.Sprintf("failed to cache transaction: %s", err.Error()))
+			}
+		}
+	}()
+
+	req, err = NewRequest(spoeMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	app, err = s.getApplication(req.app)
+	if err != nil {
+		return nil, err
+	}
+
+	tx = app.waf.NewTransactionWithID(req.id)
+	if tx.IsRuleEngineOff() {
+		app.logger.Warn("Rule engine is Off, Coraza is not going to process any rule")
+		return s.message(miss), nil
+	}
+
+	err = req.init()
+	if err != nil {
+		return nil, err
+	}
+
+	headers, err := s.readHeaders(req.headers)
+	if err != nil {
+		return nil, err
+	}
+	for key, values := range headers {
+		for _, v := range values {
+			tx.AddRequestHeader(key, v)
+		}
+	}
+
+	it, _, err := tx.WriteRequestBody(req.body)
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	tx.ProcessConnection(string(req.srcIp), req.srcPort, string(req.dstIp), req.dstPort)
+	tx.ProcessURI(req.path+"?"+req.query, req.method, "HTTP/"+req.version)
+
+	it = tx.ProcessRequestHeaders()
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	it, err = tx.ProcessRequestBody()
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	return s.message(miss), nil
+}
+
+func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
+	var (
+		err  error
+		resp *response
+		app  *application
+		tx   types.Transaction
+	)
+	defer func() {
+		app.cache.Remove(resp.id)
+	}()
+
+	resp, err = NewResponse(spoeMsg)
+	if err != nil {
+		return nil, err
+	}
+
+	app, err = s.getApplication(resp.app)
+	if err != nil {
+		return nil, err
+	}
+
+	txInterface, err := app.cache.Get(resp.id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction from cache, transaction_id: %s, app: %s, error: %s", resp.id, app.name, err.Error())
+	}
+	tx, ok := txInterface.(types.Transaction)
+	if !ok {
+		return nil, fmt.Errorf("application cache is corrupted, transaction_id: %s, app: %s", resp.id, app.name)
+	}
+
+	err = resp.init()
+	if err != nil {
+		return nil, err
+	}
+
+	headers, err := s.readHeaders(resp.headers)
+	if err != nil {
+		return nil, err
+	}
+	for key, values := range headers {
+		for _, v := range values {
+			tx.AddResponseHeader(key, v)
+		}
+	}
+
+	it, _, err := tx.WriteResponseBody(resp.body)
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	it = tx.ProcessResponseHeaders(resp.status, "HTTP/"+resp.version)
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	it, err = tx.ProcessResponseBody()
+	if err != nil {
+		return nil, err
+	}
+	if it != nil {
+		return s.processInterruption(it, hit), nil
+	}
+
+	return s.message(miss), nil
 }
