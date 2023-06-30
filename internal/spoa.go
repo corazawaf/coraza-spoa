@@ -295,7 +295,7 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		return s.message(miss), nil
 	}
 
-	req.init()
+	err = req.init()
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,7 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		return nil, fmt.Errorf("application cache is corrupted, transaction_id: %s, app: %s", resp.id, app.name)
 	}
 
-	resp.init()
+	err = resp.init()
 	if err != nil {
 		return nil, err
 	}
