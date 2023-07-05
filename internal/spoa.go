@@ -96,6 +96,11 @@ func (s *SPOA) processInterruption(it *types.Interruption, code int) []spoe.Acti
 			Scope: spoe.VarScopeTransaction,
 			Value: it.RuleID,
 		},
+		spoe.ActionSetVar{
+			Name:  "fail",
+			Scope: spoe.VarScopeTransaction,
+			Value: code,
+		},
 	}
 }
 
