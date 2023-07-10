@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - sts_fix_debian_packge
+      - sts_fix_debian_package
     tags:
       - 'v*.*.*'
 
