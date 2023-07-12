@@ -1,6 +1,12 @@
-
 # The SPOA server bind address
 bind: 0.0.0.0:9000
+log:
+  # The log level configuration, one of: debug/info/warn/error/panic/fatal
+  level: trace
+  # The log file path, /dev/stderr by default
+  file: /dev/stdout
+  # Log WAF errors as SPOA, default is false
+  waf: true
 
 # Process request and response with this application if provided app name is not found.
 # You can remove or comment out this config param if you don't need "default_application" functionality.
@@ -25,7 +31,7 @@ applications:
     # The maximum number of transactions which can be cached
     transaction_active_limit: 100000
 
-    # The log level configuration, one of: debug/info/warn/error/panic/fatal
-    log_level: info
-    # The log file path
+    # Deprecated, doesn't work
+    log_level: debug
+    # Deprecated, doesn't work
     log_file: /dev/stdout
