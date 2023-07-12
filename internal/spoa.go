@@ -19,13 +19,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const (
-	// miss sets the detection result to safe.
-	miss = iota
-	// hit opposite to Miss.
-	hit
-)
-
 // TODO - in coraza v3 ErrorLogCallback is currently in the internal package
 type ErrorLogCallback = func(rule types.MatchedRule)
 
@@ -67,14 +60,7 @@ func (s *SPOA) Start(bind string) error {
 	return nil
 }
 
-func (s *SPOA) processInterruption(it *types.Interruption, code int) []spoe.Action {
-	//if it.Status == 0 {
-	//  tx.variables.responseStatus.Set("", []string{"403"})
-	//} else {
-	//  status := strconv.Itoa(int(it.Status))
-	//  tx.variables.responseStatus.Set("", []string{status})
-	//}
-
+func (s *SPOA) processInterruption(it *types.Interruption) []spoe.Action {
 	return []spoe.Action{
 		spoe.ActionSetVar{
 			Name:  "status",
@@ -99,14 +85,15 @@ func (s *SPOA) processInterruption(it *types.Interruption, code int) []spoe.Acti
 	}
 }
 
-func (s *SPOA) message(code int) []spoe.Action {
-	return []spoe.Action{
+func (s *SPOA) allowAction() []spoe.Action {
+	act := []spoe.Action{
 		spoe.ActionSetVar{
-			Name:  "fail",
+			Name:  "action",
 			Scope: spoe.VarScopeTransaction,
-			Value: code,
+			Value: "allow",
 		},
 	}
+	return act
 }
 
 func (s *SPOA) readHeaders(headers string) (http.Header, error) {
@@ -292,7 +279,7 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 	tx = app.waf.NewTransactionWithID(req.id)
 	if tx.IsRuleEngineOff() {
 		app.logger.Warn("Rule engine is Off, Coraza is not going to process any rule")
-		return s.message(miss), nil
+		return s.allowAction(), nil
 	}
 
 	err = req.init()
@@ -315,7 +302,7 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		return nil, err
 	}
 	if it != nil {
-		return s.processInterruption(it, hit), nil
+		return s.processInterruption(it), nil
 	}
 
 	tx.ProcessConnection(string(req.srcIp), req.srcPort, string(req.dstIp), req.dstPort)
@@ -323,7 +310,7 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it = tx.ProcessRequestHeaders()
 	if it != nil {
-		return s.processInterruption(it, hit), nil
+		return s.processInterruption(it), nil
 	}
 
 	it, err = tx.ProcessRequestBody()
@@ -331,10 +318,10 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		return nil, err
 	}
 	if it != nil {
-		return s.processInterruption(it, hit), nil
+		return s.processInterruption(it), nil
 	}
 
-	return s.message(miss), nil
+	return s.allowAction(), nil
 }
 
 func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
@@ -387,12 +374,12 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		return nil, err
 	}
 	if it != nil {
-		return s.processInterruption(it, hit), nil
+		return s.processInterruption(it), nil
 	}
 
 	it = tx.ProcessResponseHeaders(resp.status, "HTTP/"+resp.version)
 	if it != nil {
-		return s.processInterruption(it, hit), nil
+		return s.processInterruption(it), nil
 	}
 
 	it, err = tx.ProcessResponseBody()
@@ -400,8 +387,8 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		return nil, err
 	}
 	if it != nil {
-		return s.processInterruption(it, hit), nil
+		return s.processInterruption(it), nil
 	}
 
-	return s.message(miss), nil
+	return s.allowAction(), nil
 }
