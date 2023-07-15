@@ -5,7 +5,7 @@
 
 ## Overview
 
-Coraza SPOA is a system daemon which runs the Coraza Web Application Firewall (WAF) as a backing service for HAProxy.  HAProxy includes a Stream Processing Offload Engine (SPOE) to offload request processing to a Stream Processing Offload Agent (SPOA). The SPOA applies filtering to the request and response using [OWASP Coraza](https://github.com/corazawaf/coraza) and provides the final verdict.
+Coraza SPOA is a system daemon which runs the Coraza Web Application Firewall (WAF) as a backing service for HAProxy.  HAProxy includes a [Stream Processing Offload Engine] (https://www.haproxy.com/blog/extending-haproxy-with-the-stream-processing-offload-engine) [SPOE](https://raw.githubusercontent.com/haproxy/haproxy/master/doc/SPOE.txt) to offload request processing to a Stream Processing Offload Agent (SPOA). The SPOA analyzes the request and response using [OWASP Coraza](https://github.com/corazawaf/coraza) and provides the final verdict back to HAProxy.
 
 ## Compilation
 
@@ -19,7 +19,7 @@ When you need to re-compile the source code, you can use the command `make clean
 
 ## Coraza SPOA
 
-The example configuration file is `config.yaml.default`, you can copy it and modify the related configuration information. You can start the service by running the command:
+The example configuration file is [config.yaml.default](https://github.com/corazawaf/coraza-spoa/blob/main/config.yaml.default), you can copy it and modify the related configuration information. You can start the service by running the command:
 
 ```
 coraza-spoa -config /etc/coraza-spoa/coraza.yaml
@@ -28,7 +28,7 @@ coraza-spoa -config /etc/coraza-spoa/coraza.yaml
 
 ## Configure a SPOE to use the service
 
-Here is the configuration template to use for your SPOE with OWASP Coraza module, you can find it in the [doc/config/coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/coraza.cfg):
+The example SPOE configuration file is [coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/coraza.cfg), you can copy it and modify the related configuration information. Default directory to place the config is `/etc/haproxy/coraza.cfg`.
 
 ```ini
 # /etc/haproxy/coraza.cfg
@@ -58,7 +58,10 @@ spoe-message coraza-res
 
 Instead of hard coded application name `str(sample_app)` you can use some HAProxy's variable. For example, frontend name `fe_name` or some custom variable.
 
-The engine is in the scope "coraza". So to enable it, you must set the following line in a frontend/listener section:
+The engine is in the scope `coraza`. So to enable it, you must set [the following line](https://github.com/corazawaf/coraza-spoa/blob/88b4e54ab3ddcb58d946ed1d6389eff73745575b/doc/config/haproxy.cfg#L21) in a `frontend` / `listener` section HAProxy config:
+```haproxy
+    filter spoe engine coraza config /etc/haproxy/coraza.cfg
+    ...
 
 ```haproxy
 # /etc/haproxy/haproxy.cfg
@@ -89,7 +92,10 @@ frontend web
     use_backend web_backend
 ```
 
-Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend "coraza-spoa" to communicate with the service, so we need to define it in the HAProxy file. For example:
+Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/88b4e54ab3ddcb58d946ed1d6389eff73745575b/doc/config/coraza.cfg#L14) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/dd5eb86d1e9abbdd5fe568249f36a6d85257eba7/doc/config/haproxy.cfg#L37):
+```haproxy
+backend coraza-spoa
+    ...
 
 ```haproxy
 # /etc/haproxy/haproxy.cfg
