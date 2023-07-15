@@ -7,6 +7,8 @@ log:
   file: /dev/stdout
   # Log WAF errors as SPOA, default is false
   waf: true
+  # The log level of underlying SPOE library (criteo/haproxy-spoe-go), one of: debug/info/warn/error/panic/fatal. Default is info.
+  spoe_level: info
 
 # Process request and response with this application if provided app name is not found.
 # You can remove or comment out this config param if you don't need "default_application" functionality.

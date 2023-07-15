@@ -39,9 +39,10 @@ type Application struct {
 
 // Log is used to manage the SPOA logging.
 type Log struct {
-	Level string `yaml:"level"`
-	File  string `yaml:"file"`
-	Waf   bool   `yaml:"waf"`
+	Level     string `yaml:"level"`
+	File      string `yaml:"file"`
+	Waf       bool   `yaml:"waf"`
+	SpoeLevel string `yaml:"spoe_level"`
 }
 
 // InitConfig initializes the configuration.

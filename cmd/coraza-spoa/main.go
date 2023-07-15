@@ -28,7 +28,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Can't initialize configuration")
 	}
 
-	log.InitLogging(config.Global.Log.File, config.Global.Log.Level)
+	log.InitLogging(config.Global.Log.File, config.Global.Log.Level, config.Global.Log.SpoeLevel)
 
 	spoa, err := internal.New(config.Global)
 	if err != nil {

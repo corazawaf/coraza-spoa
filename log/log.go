@@ -9,6 +9,7 @@ import (
 
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/rs/zerolog"
+	spoelog "github.com/sirupsen/logrus"
 )
 
 var Logger = zerolog.New(os.Stderr).Level(zerolog.InfoLevel).With().Timestamp().Logger()
@@ -20,7 +21,7 @@ var WafErrorCallback = func(mr types.MatchedRule) {
 }
 
 // InitLogging initializes the logging.
-func InitLogging(file, level string) {
+func InitLogging(file, level, spoeLevel string) {
 	if level == "" && file == "" {
 		Debug().Msg("Nothing to configure, using standard logger")
 		return
@@ -48,6 +49,17 @@ func InitLogging(file, level string) {
 	}
 
 	Logger = logger
+
+	// Setting up criteo/haproxy-spoe-go logging
+	currentSpoeLevel := spoelog.GetLevel()
+	targetSpoeLevel, err := spoelog.ParseLevel(spoeLevel)
+	if err != nil {
+		Error().Err(err).Msgf("Can't parse SPOE log level, using %v log level", currentSpoeLevel)
+
+	} else {
+		Debug().Msgf("Setting up %v SPOE log level", targetSpoeLevel)
+		spoelog.SetLevel(targetSpoeLevel)
+	}
 }
 
 func SetDebug(debug bool) {

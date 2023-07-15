@@ -8,6 +8,7 @@ require (
 	github.com/criteo/haproxy-spoe-go v1.0.6
 	github.com/magefile/mage v1.15.0
 	github.com/rs/zerolog v1.29.1
+	github.com/sirupsen/logrus v1.9.3
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -17,7 +18,6 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20211021192214-5ab2d9280aa9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
