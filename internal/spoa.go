@@ -102,6 +102,39 @@ func (s *SPOA) message(code int) []spoe.Action {
 	}
 }
 
+func (s *SPOA) error(code int, err error) []spoe.Action {
+	return []spoe.Action{
+		spoe.ActionSetVar{
+			Name:  "err_code",
+			Scope: spoe.VarScopeTransaction,
+			Value: code,
+		},
+		spoe.ActionSetVar{
+			Name:  "err_msg",
+			Scope: spoe.VarScopeTransaction,
+			Value: err.Error(),
+		},
+	}
+}
+
+func (s *SPOA) badRequestError(err error) []spoe.Action {
+	log.Error().Err(err).Msg("Bad request")
+	return s.error(1, err)
+}
+
+func (s *SPOA) badResponseError(err error) []spoe.Action {
+	log.Error().Err(err).Msg("Bad response")
+	return s.error(2, err)
+}
+
+func (s *SPOA) processRequestError(err error) []spoe.Action {
+	return s.error(3, err)
+}
+
+func (s *SPOA) processResponseError(err error) []spoe.Action {
+	return s.error(4, err)
+}
+
 func (s *SPOA) readHeaders(headers string) (http.Header, error) {
 	h := http.Header{}
 	hs := strings.Split(headers, "\r\n")
@@ -224,12 +257,12 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	req, err = NewRequest(spoeMsg)
 	if err != nil {
-		return nil, err
+		return s.badRequestError(err), nil
 	}
 
 	app, err = s.getApplication(req.app)
 	if err != nil {
-		return nil, err
+		return s.badRequestError(err), nil
 	}
 
 	tx = app.waf.NewTransactionWithID(req.id)
@@ -240,12 +273,12 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	err = req.init()
 	if err != nil {
-		return nil, err
+		return s.badRequestError(err), nil
 	}
 
 	headers, err := s.readHeaders(req.headers)
 	if err != nil {
-		return nil, err
+		return s.badRequestError(err), nil
 	}
 	for key, values := range headers {
 		for _, v := range values {
@@ -255,7 +288,8 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it, _, err := tx.WriteRequestBody(req.body)
 	if err != nil {
-		return nil, err
+		tx.DebugLogger().Error().Err(err).Str("transaction_id", tx.ID()).Msg("Failed to write request body")
+		return s.processRequestError(err), nil
 	}
 	if it != nil {
 		return s.processInterruption(it, hit), nil
@@ -271,7 +305,8 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it, err = tx.ProcessRequestBody()
 	if err != nil {
-		return nil, err
+		tx.DebugLogger().Error().Err(err).Str("transaction_id", tx.ID()).Msg("Failed to process request body")
+		return s.processRequestError(err), nil
 	}
 	if it != nil {
 		return s.processInterruption(it, hit), nil
@@ -293,12 +328,12 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	resp, err = NewResponse(spoeMsg)
 	if err != nil {
-		return nil, err
+		return s.badResponseError(err), nil
 	}
 
 	app, err = s.getApplication(resp.app)
 	if err != nil {
-		return nil, err
+		return s.badResponseError(err), nil
 	}
 
 	txInterface, err := app.cache.Get(resp.id)
@@ -312,12 +347,12 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	err = resp.init()
 	if err != nil {
-		return nil, err
+		return s.badResponseError(err), nil
 	}
 
 	headers, err := s.readHeaders(resp.headers)
 	if err != nil {
-		return nil, err
+		return s.badResponseError(err), nil
 	}
 	for key, values := range headers {
 		for _, v := range values {
@@ -327,7 +362,8 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it, _, err := tx.WriteResponseBody(resp.body)
 	if err != nil {
-		return nil, err
+		tx.DebugLogger().Error().Err(err).Str("transaction_id", tx.ID()).Msg("Failed to write response body")
+		return s.processResponseError(err), nil
 	}
 	if it != nil {
 		return s.processInterruption(it, hit), nil
@@ -340,7 +376,8 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it, err = tx.ProcessResponseBody()
 	if err != nil {
-		return nil, err
+		tx.DebugLogger().Error().Err(err).Str("transaction_id", tx.ID()).Msg("Failed to process response body")
+		return s.processResponseError(err), nil
 	}
 	if it != nil {
 		return s.processInterruption(it, hit), nil
