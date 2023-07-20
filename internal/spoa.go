@@ -318,7 +318,7 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		return s.processInterruption(it, hit), nil
 	}
 
-	tx.ProcessConnection(string(req.srcIp), req.srcPort, string(req.dstIp), req.dstPort)
+	tx.ProcessConnection(req.srcIp.String(), req.srcPort, req.dstIp.String(), req.dstPort)
 	tx.ProcessURI(req.path+"?"+req.query, req.method, "HTTP/"+req.version)
 
 	it = tx.ProcessRequestHeaders()
