@@ -7,6 +7,7 @@
 
 HAPROXY_HOST=${HAPROXY_HOST:-"localhost:4000"}
 HTTPBIN_HOST=${HTTPBIN_HOST:-"localhost:8080"}
+HAPROXY_LOGS='/haproxy/hap.log'
 
 [[ "${DEBUG}" == "true" ]] && set -x
 
@@ -82,8 +83,19 @@ function check_body() {
     echo "[Ok] Got response with an expected body (empty=${empty})"
 }
 
+# check_hap_logs checks HAProxy logs for the given regexp.
+# $1: The regexp to check logs aginst.
+function check_hap_logs() {
+    local regex=${1}
+    if [[ $(grep -q -e "$regex" "$HAPROXY_LOGS") ]]; then
+      echo -e "[Fail] No log lines matches pattern '$regex'"
+      exit 1
+    fi
+    echo "[Ok] Got logs with an expected pattern '$regex'"
+}
+
 step=1
-total_steps=12
+total_steps=17
 
 ## Testing that basic coraza phases are working
 
@@ -158,5 +170,30 @@ check_status "${url_echo}" 403 --user-agent "Grabber/0.1 (X11; U; Linux i686; en
 ((step+=1))
 echo "[${step}/${total_steps}] True negative GET request with user-agent"
 check_status "${url_echo}" 200 --user-agent "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/105.0.0.0 Safari/537.36"
+
+# Find Allow action
+((step+=1))
+echo "[${step}/${total_steps}] HAP log format (waf-action: allow)"
+check_hap_logs "waf-action: allow"
+
+# Find Deny action
+((step+=1))
+echo "[${step}/${total_steps}] HAP log format (waf-action: deny)"
+check_hap_logs "waf-action: deny"
+
+# Find Drop action
+((step+=1))
+echo "[${step}/${total_steps}] HAP log format (waf-action: drop)"
+check_hap_logs "waf-action: drop"
+
+# Find Redirect action
+((step+=1))
+echo "[${step}/${total_steps}] HAP log format (waf-action: redirect)"
+check_hap_logs "waf-action: redirect"
+
+# Find no error
+((step+=1))
+echo "[${step}/${total_steps}] HAP log format (spoa-error: -)"
+check_hap_logs "spoa-error: -"
 
 echo "[Done] All tests passed"

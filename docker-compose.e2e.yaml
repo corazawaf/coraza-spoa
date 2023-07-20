@@ -15,6 +15,12 @@ services:
       - coraza
       - httpbin
     image: ${HAPROXY_IMAGE:-haproxy:2.7-alpine}
+    command:
+      [
+        "sh",
+        "-c",
+        "haproxy -f /usr/local/etc/haproxy/haproxy.cfg | tee /var/lib/haproxy/hap.log"
+      ]
     ports: [ "4000:80" ]
     links:
       - "coraza:coraza"
@@ -23,6 +29,7 @@ services:
       - type: bind
         source: ./docker/haproxy
         target: /usr/local/etc/haproxy
+      - hap:/var/lib/haproxy
   tests:
     depends_on:
       - haproxy
@@ -33,3 +40,7 @@ services:
     build:
       context: docker/e2e
       dockerfile: ./Dockerfile.curl
+    volumes:
+      - hap:/haproxy
+volumes:
+  hap:
