@@ -35,7 +35,7 @@ endif
 default: build
 
 build:
-	GOARCH=$(ARCH) GOOS=$(OS) go build -v ${LDFLAGS} -o $(BINARY)_$(ARCH) cmd/coraza-spoa/main.go
+	GOARCH=$(ARCH) GOOS=$(OS) CGO_ENABLED=0 go build -v ${LDFLAGS} -o $(BINARY)_$(ARCH) cmd/coraza-spoa/main.go
 
 clean:
 	rm -f $(BINARY)_amd64 $(BINARY)_arm64 $(BINARY)_386
