@@ -10,7 +10,7 @@ Type=exec
 User=coraza-spoa
 Group=coraza-spoa
 
-## Hardening
+# Hardening
 AmbientCapabilities=
 MountFlags=private
 
