@@ -161,8 +161,7 @@ func New(conf *config.Config) (*SPOA, error) {
 
 		waf, err := coraza.NewWAF(wafConf)
 		if err != nil {
-			log.Error().Err(err).Str("app", name).Msg("Unable to create WAF instance")
-			return nil, err
+			return nil, fmt.Errorf("Unable to create WAF instance. app:%s, err:%w", name, err)
 		}
 
 		app := &application{

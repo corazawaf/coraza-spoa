@@ -34,7 +34,7 @@ applications:
     # The maximum number of transactions which can be cached
     transaction_active_limit: 100000
 
-    # Deprecated, doesn't work
+    # Deprecated, doesn't work. Use root.log.level
     log_level: info
-    # Deprecated, doesn't work
+    # Deprecated, doesn't work. Use root.log.file
     log_file: /dev/stdout

@@ -70,7 +70,7 @@ func validateConfig() error {
 	log.Info().Msgf("Loading %d applications", len(Global.Applications))
 
 	for name, app := range Global.Applications {
-		log.Debug().Msgf("Validating %s application config", name)
+		log.Debug().Str("name", name).Msg("Validating application config")
 
 		// Deprecated: #70: use Config.Log.Level to set up application logging or SecDebugLogLevel to set up Coraza logging
 		if app.LogLevel != "" {

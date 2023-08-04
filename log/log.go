@@ -41,10 +41,10 @@ func InitLogging(file, level, spoeLevel string) {
 	currentLevel := Logger.GetLevel()
 	targetLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
-		Error().Err(err).Msgf("Can't parse log level, using %v log level", currentLevel)
+		Error().Err(err).Msgf("Can't parse log level, using '%v' log level", currentLevel)
 
 	} else if targetLevel < currentLevel {
-		Debug().Msgf("Setting up %v log level", targetLevel)
+		Debug().Msgf("Setting up '%v' log level", targetLevel)
 		logger = logger.Level(targetLevel)
 	}
 
@@ -54,10 +54,10 @@ func InitLogging(file, level, spoeLevel string) {
 	currentSpoeLevel := spoelog.GetLevel()
 	targetSpoeLevel, err := spoelog.ParseLevel(spoeLevel)
 	if err != nil {
-		Error().Err(err).Msgf("Can't parse SPOE log level, using %v log level", currentSpoeLevel)
+		Error().Err(err).Msgf("Can't parse SPOE log level, using '%v' log level", currentSpoeLevel)
 
 	} else {
-		Debug().Msgf("Setting up %v SPOE log level", targetSpoeLevel)
+		Debug().Msgf("Setting up '%v' SPOE log level", targetSpoeLevel)
 		spoelog.SetLevel(targetSpoeLevel)
 	}
 }
@@ -65,7 +65,7 @@ func InitLogging(file, level, spoeLevel string) {
 func SetDebug(debug bool) {
 	if debug && Logger.GetLevel() != zerolog.DebugLevel {
 		Logger = Logger.Level(zerolog.DebugLevel)
-		Debug().Msgf("Using %v log level", zerolog.DebugLevel)
+		Debug().Msgf("Using '%v' log level", zerolog.DebugLevel)
 	}
 }
 
