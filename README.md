@@ -1,11 +1,14 @@
-# Owasp Coraza Haproxy
+<h1>
+  <img src="https://coraza.io/images/logo_shield_only.png" align="left" height="46px" alt=""/>
+  <span>Coraza SPOA - HAProxy Web Application Firewall</span>
+</h1>
 
 [![Code Linting](https://github.com/corazawaf/coraza-spoa/actions/workflows/lint.yaml/badge.svg)](https://github.com/corazawaf/coraza-spoa/actions/workflows/lint.yaml)
 [![CodeQL Scanning](https://github.com/corazawaf/coraza-spoa/actions/workflows/codeql.yaml/badge.svg)](https://github.com/corazawaf/coraza-spoa/actions/workflows/codeql.yaml)
 
-## Overview
+Coraza SPOA is a system daemon which brings the Coraza Web Application Firewall (WAF) as a backing service for HAProxy. It is written in Go, Coraza supports ModSecurity SecLang rulesets and is 100% compatible with the OWASP Core Rule Set v4.
 
-This is a third-party daemon that connects to SPOE. It sends the request and response sent by HAProxy to [OWASP Coraza](https://github.com/corazawaf/coraza) and returns the verdict.
+HAProxy includes a [Stream Processing Offload Engine](https://www.haproxy.com/blog/extending-haproxy-with-the-stream-processing-offload-engine) [SPOE](https://raw.githubusercontent.com/haproxy/haproxy/master/doc/SPOE.txt) to offload request processing to a Stream Processing Offload Agent (SPOA). Coraza SPOA embeds the [Coraza Engine](https://github.com/corazawaf/coraza), loads the ruleset and filters http requests or application responses which are passed forwarded by HAProxy for inspection.
 
 ## Compilation
 
@@ -17,79 +20,59 @@ The command `make` will compile the source code and produce the executable file 
 
 When you need to re-compile the source code, you can use the command `make clean` to clean the executable file.
 
-## Configuration file
+## Configuration
 
-The example configuration file is `config.yaml.default`, you can copy it and modify the related configuration information.
+## Coraza SPOA
 
-## Start the service
+The example configuration file is [config.yaml.default](https://github.com/corazawaf/coraza-spoa/blob/main/config.yaml.default), you can copy it and modify the related configuration information. You can start the service by running the command:
 
-After you have compiled it, you can start the service by running the command `./coraza-spoa`.
-
-```shell
-$> ./coraza-spoa -h
-Usage of ./coraza-spoa:
-  -config string
-        configuration file
+```
+coraza-spoa -config /etc/coraza-spoa/coraza.yaml
 ```
 
-## Configure a SPOE to use the service
+You will also want to download & extract the [OWASP Core Ruleset]( https://github.com/coreruleset/coreruleset/releases) (version 4+ supported) to the `/etc/coraza-spoa` directory.
 
-Here is the configuration template to use for your SPOE with OWASP Coraza module, you can find it in the [doc/config/coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/coraza.cfg):
+## HAProxy SPOE
 
-```editorconfig
-[coraza]
+Configure HAProxy to exchange messages with the SPOA. The example SPOE configuration file is [coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/coraza.cfg), you can copy it and modify the related configuration information. Default directory to place the config is `/etc/haproxy/coraza.cfg`.
+
+```ini
+# /etc/haproxy/coraza.cfg
 spoe-agent coraza-agent
-    messages    coraza-req      coraza-res
-    option      var-prefix      coraza
-    option      set-on-error    error
-    timeout     hello           100ms
-    timeout     idle            2m
-    timeout     processing      500ms
+    ...
     use-backend coraza-spoa
-    log global
 
 spoe-message coraza-req
-    args app=str(sample_app) id=unique-id src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
+    args app=str(sample_app) id=unique-id src-ip=src ...
     event on-frontend-http-request
-
-spoe-message coraza-res
-    args app=str(sample_app) id=unique-id version=res.ver status=status headers=res.hdrs body=res.body
-    event on-http-response
 ```
 
-Instead of hard coded application name `str(sample_app)` you can use some HAProxy's variable. For example, frontend name `fe_name` or some custom variable.
+The application name from `config.yaml` must match the `app=` name, or the `default_application` will be used.
 
-The engine is in the scope "coraza". So to enable it, you must set the following line in a frontend/listener section:
+The backend defined in `use-backend` must match a `haproxy.cfg` backend which directs requests to the SPOA daemon reachable via `127.0.0.1:9000`.
 
-``` editorconfig
-frontend coraza.io
+Instead of the hard coded application name `str(sample_app)` you can use some HAProxy variables. For example, frontend name `fe_name`.
+
+## HAProxy
+
+Configure HAProxy with a frontend, which contains a `filter` statement to forward requests to the SPOA and deny based on the returned action. Also add a backend section, which is referenced by use-backend in `coraza.cfg`.
+
+```haproxy
+# /etc/haproxy/haproxy.cfg
+frontend web
+    filter spoe engine coraza config /etc/haproxy/coraza.cfg
     ...
-    unique-id-format %[uuid()]
-    unique-id-header X-Unique-ID
-    filter spoe engine coraza config coraza.cfg
+    http-request deny deny_status 403 hdr waf-block "request"  if { var(txn.coraza.action) -m str deny }
     ...
-```
 
-Because, in SPOE configuration file, we declare to use the backend "coraza-spoa" to communicate with the service, so we need to define it in the HAProxy file. For example:
-
-```editorconfig
 backend coraza-spoa
     mode tcp
-    balance roundrobin
-    timeout connect 5000ms
-    timeout client 5000ms
-    timeout server 5000ms
     server s1 127.0.0.1:9000
 ```
 
-The OWASP Coraza action is returned in a variable named "txn.coraza.fail". It contains the verdict of the request. If the variable is set to 1, the request will be denied.
+A comprehensive HAProxy configuration example can be found in [docs/config/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/coraza.cfg).
 
-```editorconfig
-http-request deny if { var(txn.coraza.fail) -m int eq 1 }
-http-response deny if { var(txn.coraza.fail) -m int eq 1 }
-```
-
-With this rule, all unsafe requests will be rejected. You can find the example HAProxy configuration file in the [doc/config/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/haproxy.cfg).
+Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/88b4e54ab3ddcb58d946ed1d6389eff73745575b/doc/config/coraza.cfg#L14) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/dd5eb86d1e9abbdd5fe568249f36a6d85257eba7/doc/config/haproxy.cfg#L37):
 
 ## Docker
 
