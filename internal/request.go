@@ -4,9 +4,9 @@
 package internal
 
 import (
-	"fmt"
 	"net"
 
+	"github.com/corazawaf/coraza-spoa/log"
 	spoe "github.com/criteo/haproxy-spoe-go"
 )
 
@@ -78,22 +78,22 @@ func (req *request) init() error {
 
 	req.path, err = req.msg.getStringArg("path")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Trace().Err(err).Msg("Can't get Path from HTTP Request")
 	}
 
 	req.query, err = req.msg.getStringArg("query")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Trace().Err(err).Msg("Can't get Query from HTTP Request")
 	}
 
 	req.version, err = req.msg.getStringArg("version")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Trace().Err(err).Msg("Can't get Version from HTTP Request")
 	}
 
 	req.headers, err = req.msg.getStringArg("headers")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Trace().Err(err).Msg("Can't get Headers from HTTP Request")
 	}
 
 	req.body, _ = req.msg.getByteArrayArg("body")

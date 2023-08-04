@@ -4,8 +4,7 @@
 package internal
 
 import (
-	"fmt"
-
+	"github.com/corazawaf/coraza-spoa/log"
 	spoe "github.com/criteo/haproxy-spoe-go"
 )
 
@@ -46,7 +45,7 @@ func (resp *response) init() error {
 
 	resp.version, err = resp.msg.getStringArg("version")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Trace().Err(err).Msg("Can't get Version from HTTP Request")
 	}
 
 	resp.status, err = resp.msg.getIntArg("status")
@@ -56,7 +55,7 @@ func (resp *response) init() error {
 
 	resp.headers, err = resp.msg.getStringArg("headers")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Trace().Err(err).Msg("Can't get Headers from HTTP Request")
 	}
 
 	resp.body, _ = resp.msg.getByteArrayArg("body")
