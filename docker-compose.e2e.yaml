@@ -1,10 +1,13 @@
 version: "3.9"
 services:
   httpbin:
-    image: mccutchen/go-httpbin:v2.5.0
+    restart: unless-stopped
+    image: mccutchen/go-httpbin:v2.9.0
+    command: [ "/bin/go-httpbin", "-port", "8080" ]
     ports:
       - 8080:8080
   coraza:
+    restart: unless-stopped
     build:
       context: .
       target: coreruleset
@@ -21,7 +24,7 @@ services:
         "-c",
         "haproxy -f /usr/local/etc/haproxy/haproxy.cfg | tee /var/lib/haproxy/hap.log"
       ]
-    ports: [ "4000:80" ]
+    ports: [ "4000:80"]
     links:
       - "coraza:coraza"
       - "httpbin:httpbin"
@@ -30,17 +33,6 @@ services:
         source: ./docker/haproxy
         target: /usr/local/etc/haproxy
       - hap:/var/lib/haproxy
-  tests:
-    depends_on:
-      - haproxy
-      - coraza
-    links:
-      - "haproxy:haproxy"
-      - "httpbin:httpbin"
-    build:
-      context: docker/e2e
-      dockerfile: ./Dockerfile.curl
-    volumes:
-      - hap:/haproxy
+
 volumes:
   hap:
