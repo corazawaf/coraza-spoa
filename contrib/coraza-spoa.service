@@ -3,7 +3,7 @@ Description=Coraza WAF SPOA Daemon
 Documentation=https://www.coraza.io
 
 [Service]
-ExecStart=/usr/bin/coraza-spoa -config=/etc/coraza-spoa/config.yaml
+ExecStart=/usr/bin/coraza-spoa -config-file=/etc/coraza-spoa/config.yaml
 WorkingDirectory=/
 Restart=always
 Type=exec
