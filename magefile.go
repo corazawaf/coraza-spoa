@@ -19,8 +19,8 @@ import (
 
 var addLicenseVersion = "v1.0.0" // https://github.com/google/addlicense
 // TODO: Use recent version (for example v1.53.2) to run on Go 1.20 (https://github.com/golangci/golangci-lint/pull/3414)
-var golangCILintVer = "v1.48.0"  // https://github.com/golangci/golangci-lint/releases
-var gosImportsVer = "v0.1.5"     // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
+var golangCILintVer = "v1.48.0" // https://github.com/golangci/golangci-lint/releases
+var gosImportsVer = "v0.1.5"    // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
 
 var errRunGoModTidy = errors.New("go.mod/sum not formatted, commit changes")
 var errNoGitDir = errors.New("no .git directory found")
@@ -71,6 +71,31 @@ func Test() error {
 	}
 
 	return nil
+}
+
+// E2e runs e2e tests with a built plugin against the e2e deployment. Requires docker-compose.
+func E2e() error {
+	var err error
+	if err = sh.RunV("docker-compose", "-f", "docker-compose.e2e.yaml", "up", "-d", "haproxy"); err != nil {
+		return err
+	}
+	defer func() {
+		_ = sh.RunV("docker-compose", "--file", "docker-compose.e2e.yaml", "down", "-v")
+	}()
+
+	haproxyHost := os.Getenv("HAPROXY_HOST")
+	if haproxyHost == "" {
+		haproxyHost = "localhost:4000"
+	}
+	httpbinHost := os.Getenv("HTTPBIN_HOST")
+	if httpbinHost == "" {
+		httpbinHost = "localhost:8080"
+	}
+
+	if err = sh.RunV("go", "run", "github.com/corazawaf/coraza/v3/http/e2e/cmd/httpe2e@main", "--proxy-hostport", "http://"+haproxyHost, "--httpbin-hostport", "http://"+httpbinHost); err != nil {
+		sh.RunV("docker-compose", "-f", "docker-compose.e2e.yaml", "logs", "haproxy")
+	}
+	return err
 }
 
 // Precommit installs a git hook to run check when committing
