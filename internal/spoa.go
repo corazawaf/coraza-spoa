@@ -4,6 +4,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,12 +12,14 @@ import (
 	"time"
 
 	"github.com/bluele/gcache"
-	"github.com/corazawaf/coraza-spoa/config"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
-	spoe "github.com/criteo/haproxy-spoe-go"
+	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
+	"github.com/dropmorepackets/haproxy-go/spop"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/corazawaf/coraza-spoa/config"
 )
 
 // TODO - in coraza v3 ErrorLogCallback is currently in the internal package
@@ -36,64 +39,43 @@ type SPOA struct {
 	defaultApplication string
 }
 
+func (s *SPOA) HandleSPOE(_ context.Context, w *encoding.ActionWriter, m *encoding.Message) {
+	var err error
+	switch string(m.NameBytes()) {
+	case "coraza-req":
+		err = s.processRequest(w, m)
+	case "coraza-res":
+		err = s.processResponse(w, m)
+	}
+	if err != nil {
+		s.applications[s.defaultApplication].logger.Error("HandleSPOE", zap.Error(err))
+	}
+}
+
 // Start starts the SPOA to detect the security risks.
 func (s *SPOA) Start(bind string) error {
 	// s.logger.Info("Starting SPOA")
 
-	agent := spoe.New(func(messages *spoe.MessageIterator) ([]spoe.Action, error) {
-		for messages.Next() {
-			msg := messages.Message
-
-			switch msg.Name {
-			case "coraza-req":
-				return s.processRequest(&msg)
-			case "coraza-res":
-				return s.processResponse(&msg)
-			}
-		}
-		return nil, nil
-	})
 	defer s.cleanApplications()
-	if err := agent.ListenAndServe(bind); err != nil {
+	return spop.ListenAndServe(bind, s)
+}
+
+func (s *SPOA) processInterruption(w *encoding.ActionWriter, it *types.Interruption) error {
+	if err := w.SetInt64(encoding.VarScopeTransaction, "status", int64(it.Status)); err != nil {
 		return err
 	}
-	return nil
+	if err := w.SetString(encoding.VarScopeTransaction, "action", it.Action); err != nil {
+		return err
+	}
+	if err := w.SetString(encoding.VarScopeTransaction, "data", it.Data); err != nil {
+		return err
+	}
+
+	return w.SetInt64(encoding.VarScopeTransaction, "ruleid", int64(it.RuleID))
 }
 
-func (s *SPOA) processInterruption(it *types.Interruption) []spoe.Action {
-	return []spoe.Action{
-		spoe.ActionSetVar{
-			Name:  "status",
-			Scope: spoe.VarScopeTransaction,
-			Value: it.Status,
-		},
-		spoe.ActionSetVar{
-			Name:  "action",
-			Scope: spoe.VarScopeTransaction,
-			Value: it.Action,
-		},
-		spoe.ActionSetVar{
-			Name:  "data",
-			Scope: spoe.VarScopeTransaction,
-			Value: it.Data,
-		},
-		spoe.ActionSetVar{
-			Name:  "ruleid",
-			Scope: spoe.VarScopeTransaction,
-			Value: it.RuleID,
-		},
-	}
-}
-
-func (s *SPOA) allowAction() []spoe.Action {
-	act := []spoe.Action{
-		spoe.ActionSetVar{
-			Name:  "action",
-			Scope: spoe.VarScopeTransaction,
-			Value: "allow",
-		},
-	}
-	return act
+func (s *SPOA) allowAction(w *encoding.ActionWriter) error {
+	return w.SetString(encoding.VarScopeTransaction, "action", "allow")
 }
 
 func (s *SPOA) readHeaders(headers string) (http.Header, error) {
@@ -238,7 +220,7 @@ func (s *SPOA) getApplication(appName string) (*application, error) {
 	return nil, fmt.Errorf("application not found, application %s, default: %s", appName, s.defaultApplication)
 }
 
-func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
+func (s *SPOA) processRequest(w *encoding.ActionWriter, m *encoding.Message) error {
 	var (
 		err error
 		req *request
@@ -266,30 +248,30 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		}
 	}()
 
-	req, err = NewRequest(spoeMsg)
+	req, err = NewRequest(m)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	app, err = s.getApplication(req.app)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	tx = app.waf.NewTransactionWithID(req.id)
 	if tx.IsRuleEngineOff() {
 		app.logger.Warn("Rule engine is Off, Coraza is not going to process any rule")
-		return s.allowAction(), nil
+		return s.allowAction(w)
 	}
 
 	err = req.init()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	headers, err := s.readHeaders(req.headers)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for key, values := range headers {
 		for _, v := range values {
@@ -299,10 +281,10 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it, _, err := tx.WriteRequestBody(req.body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if it != nil {
-		return s.processInterruption(it), nil
+		return s.processInterruption(w, it)
 	}
 
 	tx.ProcessConnection(req.srcIp.String(), req.srcPort, req.dstIp.String(), req.dstPort)
@@ -310,21 +292,21 @@ func (s *SPOA) processRequest(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it = tx.ProcessRequestHeaders()
 	if it != nil {
-		return s.processInterruption(it), nil
+		return s.processInterruption(w, it)
 	}
 
 	it, err = tx.ProcessRequestBody()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if it != nil {
-		return s.processInterruption(it), nil
+		return s.processInterruption(w, it)
 	}
 
-	return s.allowAction(), nil
+	return s.allowAction(w)
 }
 
-func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
+func (s *SPOA) processResponse(w *encoding.ActionWriter, m *encoding.Message) error {
 	var (
 		err  error
 		resp *response
@@ -335,33 +317,33 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 		app.cache.Remove(resp.id)
 	}()
 
-	resp, err = NewResponse(spoeMsg)
+	resp, err = NewResponse(m)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	app, err = s.getApplication(resp.app)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	txInterface, err := app.cache.Get(resp.id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction from cache, transaction_id: %s, app: %s, error: %s", resp.id, app.name, err.Error())
+		return fmt.Errorf("failed to get transaction from cache, transaction_id: %s, app: %s, error: %s", resp.id, app.name, err.Error())
 	}
 	tx, ok := txInterface.(types.Transaction)
 	if !ok {
-		return nil, fmt.Errorf("application cache is corrupted, transaction_id: %s, app: %s", resp.id, app.name)
+		return fmt.Errorf("application cache is corrupted, transaction_id: %s, app: %s", resp.id, app.name)
 	}
 
 	err = resp.init()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	headers, err := s.readHeaders(resp.headers)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for key, values := range headers {
 		for _, v := range values {
@@ -371,24 +353,24 @@ func (s *SPOA) processResponse(spoeMsg *spoe.Message) ([]spoe.Action, error) {
 
 	it, _, err := tx.WriteResponseBody(resp.body)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if it != nil {
-		return s.processInterruption(it), nil
+		return s.processInterruption(w, it)
 	}
 
 	it = tx.ProcessResponseHeaders(resp.status, "HTTP/"+resp.version)
 	if it != nil {
-		return s.processInterruption(it), nil
+		return s.processInterruption(w, it)
 	}
 
 	it, err = tx.ProcessResponseBody()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if it != nil {
-		return s.processInterruption(it), nil
+		return s.processInterruption(w, it)
 	}
 
-	return s.allowAction(), nil
+	return s.allowAction(w)
 }

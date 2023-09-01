@@ -6,7 +6,7 @@ package internal
 import (
 	"fmt"
 
-	spoe "github.com/criteo/haproxy-spoe-go"
+	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 )
 
 type response struct {
@@ -19,7 +19,7 @@ type response struct {
 	body    []byte
 }
 
-func NewResponse(spoeMsg *spoe.Message) (*response, error) {
+func NewResponse(spoeMsg *encoding.Message) (*response, error) {
 	msg, err := NewMessage(spoeMsg)
 	if err != nil {
 		return nil, err

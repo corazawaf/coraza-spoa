@@ -5,36 +5,40 @@ package internal
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
-	spoe "github.com/criteo/haproxy-spoe-go"
+	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 )
 
 type message struct {
-	msg  *spoe.Message
-	args map[string]interface{}
+	args map[string]any
 }
 
-func NewMessage(msg *spoe.Message) (*message, error) {
-	message := message{
-		msg:  msg,
-		args: make(map[string]interface{}, msg.Args.Count()),
+func NewMessage(m *encoding.Message) (*message, error) {
+	msg := message{
+		args: make(map[string]any),
 	}
-	return &message, nil
+
+	e := encoding.AcquireKVEntry()
+	defer encoding.ReleaseKVEntry(e)
+
+	for m.KV.Next(e) {
+		switch e.Type() {
+		case encoding.DataTypeInt32, encoding.DataTypeInt64,
+			encoding.DataTypeUInt32, encoding.DataTypeUInt64:
+			msg.args[string(e.NameBytes())] = int(e.ValueInt())
+		default:
+			msg.args[string(e.NameBytes())] = e.Value()
+		}
+	}
+
+	return &msg, nil
 }
 
-func (m *message) findArg(name string) (interface{}, error) {
+func (m *message) findArg(name string) (any, error) {
 	argVal, exist := m.args[name]
 	if exist {
 		return argVal, nil
-	}
-
-	ai := m.msg.Args
-	for ai.Next() {
-		m.args[ai.Arg.Name] = ai.Arg.Value
-		if ai.Arg.Name == name {
-			return ai.Arg.Value, nil
-		}
 	}
 
 	return nil, &ArgNotFoundError{name}
@@ -85,17 +89,17 @@ func (m *message) getByteArrayArg(name string) ([]byte, error) {
 	return val, nil
 }
 
-func (m *message) getIpArg(name string) (net.IP, error) {
+func (m *message) getIpArg(name string) (netip.Addr, error) {
 	argVal, err := m.findArg(name)
 	if err != nil {
-		return nil, err
+		return netip.Addr{}, err
 	}
 	if argVal == nil {
-		return nil, nil
+		return netip.Addr{}, nil
 	}
-	val, ok := argVal.(net.IP)
+	val, ok := argVal.(netip.Addr)
 	if !ok {
-		return nil, &typeMismatchError{name, "net.IP", argVal}
+		return netip.Addr{}, &typeMismatchError{name, "netip.Addr", argVal}
 	}
 	return val, nil
 }
@@ -111,7 +115,7 @@ func (e *ArgNotFoundError) Error() string {
 type typeMismatchError struct {
 	key          string
 	expectedType string
-	actualValue  interface{}
+	actualValue  any
 }
 
 func (e *typeMismatchError) Error() string {

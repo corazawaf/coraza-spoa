@@ -5,18 +5,18 @@ package internal
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
-	spoe "github.com/criteo/haproxy-spoe-go"
+	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 )
 
 type request struct {
 	msg     *message
 	app     string
 	id      string
-	srcIp   net.IP
+	srcIp   netip.Addr
 	srcPort int
-	dstIp   net.IP
+	dstIp   netip.Addr
 	dstPort int
 	method  string
 	path    string
@@ -26,7 +26,7 @@ type request struct {
 	body    []byte
 }
 
-func NewRequest(spoeMsg *spoe.Message) (*request, error) {
+func NewRequest(spoeMsg *encoding.Message) (*request, error) {
 	msg, err := NewMessage(spoeMsg)
 	if err != nil {
 		return nil, err
