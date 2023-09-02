@@ -1,7 +1,7 @@
 # Copyright 2023 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
 
-FROM --platform=$BUILDPLATFORM golang:1.19-alpine3.17 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine3.18 AS builder
 
 WORKDIR /build
 COPY . /build
@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     OS=${TARGETOS} ARCH=${TARGETARCH} make
 
 # ---
-FROM alpine:3.17 AS main
+FROM alpine:3.18 AS main
 
 ARG TARGETARCH
 
@@ -53,29 +53,5 @@ HEALTHCHECK --interval=10s --timeout=2s --retries=2 CMD "/usr/bin/socat /dev/nul
 
 ENTRYPOINT ["tini", "--", "/docker-entrypoint.sh"]
 
-CMD ["/usr/bin/coraza-spoa", "--config", "/etc/coraza-spoa/config.yaml"]
+CMD ["/usr/bin/coraza-spoa", "-f", "/etc/coraza-spoa/config.yaml"]
 
-# ---
-FROM main AS coreruleset
-
-ARG CORERULESET_VERSION=v4.0.0-rc1
-ARG CORERULESET_SHA256SUM=a8f0d1cac941bf2158988b92a91519f093a8bce64a260e46fa352d608c7de3e6
-
-# Switch to root for crs installation
-USER root
-
-# Download the core rule set
-RUN set -xe \
-    && wget -O /tmp/crs.tgz https://github.com/coreruleset/coreruleset/archive/refs/tags/${CORERULESET_VERSION}.tar.gz
-
-RUN echo "$CORERULESET_SHA256SUM  /tmp/crs.tgz" | sha256sum -c
-
-RUN set -xe \
-    && mkdir crs \
-    && tar --strip-components 1 -C crs -xf /tmp/crs.tgz \
-    && mv crs/crs-setup.conf.example /etc/coraza-spoa/crs-setup.conf \
-    && mv crs/rules /etc/coraza-spoa \
-    && if [[ -d crs/plugins ]] ; then mv crs/plugins /etc/coraza-spoa ; fi \
-    && rm -rf crs /tmp/crs.tgz
-
-USER coraza-spoa

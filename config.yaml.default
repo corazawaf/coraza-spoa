@@ -6,25 +6,61 @@ bind: 0.0.0.0:9000
 # You can remove or comment out this config param if you don't need "default_application" functionality.
 default_application: sample_app
 
+# The maximum number of connections to accept
+# If not set, the default value is 5
+# It is recommended to set this value to the same value as the maxconn parameter in HAProxy
+# It is also recommended to use a number close to the number of CPU cores
+max_connections: 5
+
+# The maximum number of transactions which can be cached
+transaction_active_limit: 1000
+
+# After reaching the maximum number of transactions:
+# If true then the new transactions will be rejected with deny and status code 503
+# If false, the new transaction will be processed, ignoring the response
+transaction_active_limit_reject: false
+
+# The log level configuration, one of: debug/info/warn/error/panic/fatal
+log_level: info
+# The log file path
+log_file: /dev/stdout
+# The log format, one of: console/json
+log_format: console
+
+# Include all files in the glob pattern
+# The files must be in YAML format
+# All configurations are loaded in alphabetical order
+# The configuration is merged with the global configuration
+# First the included configurations will be loaded
+# include: 
+#   - /etc/coraza-spoa/applications.d/*.yaml
+
 applications:
-  sample_app:
+  # name is used as key to identify the directives
+  - name: sample_app
     # Get the coraza.conf from https://github.com/corazawaf/coraza
     #
     # Download the OWASP CRS from https://github.com/coreruleset/coreruleset/releases
     # and copy crs-setup.conf & the rules, plugins directories to /etc/coraza-spoa
+    # Also the built-in OWASP CRS rules are available in @owasp_crs/
     directives: |
-      Include /etc/coraza-spoa/coraza.conf
-      Include /etc/coraza-spoa/crs-setup.conf
-      Include /etc/coraza-spoa/rules/*.conf
+      Include @coraza.conf-recommended
+      SecRuleEngine On
+      SecAction \
+          "id:900990,\
+          phase:1,\
+          pass,\
+          t:none,\
+          nolog,\
+          setvar:tx.crs_setup_version=400"
+      SecDefaultAction "phase:1,log,noauditlog,deny,status:403"
+      Include @owasp_crs/*.conf
 
     # HAProxy configured to send requests only, that means no cache required
-    # NOTE: there are still some memory & caching issues, so use this with care
-    no_response_check: true
+    response_check: false
 
     # The transaction cache lifetime in milliseconds (60000ms = 60s)
     transaction_ttl_ms: 60000
-    # The maximum number of transactions which can be cached
-    transaction_active_limit: 100000
 
     # The log level configuration, one of: debug/info/warn/error/panic/fatal
     log_level: info
