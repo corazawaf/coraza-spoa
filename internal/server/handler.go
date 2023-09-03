@@ -59,10 +59,6 @@ func (h handler) handler(req *request.Request) error {
 	if a == nil {
 		return fmt.Errorf("app %q not found", app.(string))
 	}
-	id, ok := msg.KV.Get("id")
-	if !ok {
-		return errors.New("ID argument not received")
-	}
 	if isRequest {
 
 		req := requestPool.Get().(*applicationRequest)
@@ -71,9 +67,15 @@ func (h handler) handler(req *request.Request) error {
 		if err := req.Fill(msg); err != nil {
 			return err
 		}
-		err = a.HandleRequest(id.(string), req)
+		err = a.HandleRequest(req)
 	} else {
-		err = a.HandleResponse(id.(string), msg)
+		res := responsePool.Get().(*applicationResponse)
+		defer responsePool.Put(req)
+
+		if err := res.Fill(msg); err != nil {
+			return err
+		}
+		err = a.HandleResponse(res)
 	}
 	return err
 }

@@ -6,17 +6,22 @@ import (
 	"unsafe"
 
 	"github.com/corazawaf/coraza-spoa/internal/config"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
 var apps unsafe.Pointer
 
 type appManager struct {
-	config *viper.Viper
-	apps   map[string]*application
+	config             *viper.Viper
+	apps               map[string]*application
+	logger             *zerolog.Logger
+	defaultApplication string
 }
 
 func (a *appManager) Add(app *config.Application) error {
+	log.Info().Msgf("Adding application %s", app.Name)
 	if _, ok := a.apps[app.Name]; ok {
 		return fmt.Errorf("app %s already exist", app.Name)
 	}

@@ -53,8 +53,6 @@ func (r *applicationRequest) Fill(msg *message.Message) error {
 			*p = v.Value.(string)
 		case *int64:
 			*p = v.Value.(int64)
-		case *int:
-			*p = v.Value.(int)
 		case *net.IP:
 			*p = v.Value.(net.IP)
 		case *[]byte:

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/negasus/haproxy-spoe-go/message"
 )
@@ -44,4 +45,17 @@ func (r *applicationResponse) Fill(msg *message.Message) error {
 		}
 	}
 	return nil
+}
+
+var responsePool = sync.Pool{
+	New: func() interface{} {
+		return &applicationResponse{
+			app:     "",
+			id:      "",
+			version: "",
+			status:  0,
+			headers: "",
+			body:    []byte{},
+		}
+	},
 }

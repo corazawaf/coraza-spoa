@@ -2,16 +2,18 @@ package server
 
 import (
 	"fmt"
-	"os"
 	"strings"
+	"time"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset"
 	"github.com/corazawaf/coraza-coreruleset/io"
+	"github.com/corazawaf/coraza-spoa/internal/cache"
 	"github.com/corazawaf/coraza-spoa/internal/config"
+	"github.com/corazawaf/coraza-spoa/internal/logger"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
-	"github.com/negasus/haproxy-spoe-go/message"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/yalue/merged_fs"
 )
 
@@ -33,13 +35,15 @@ func (e *ErrInterrupted) Is(target error) bool {
 
 type application struct {
 	config.Application
-	responseEnabled bool
-	waf             coraza.WAF
-	logger          zerolog.Logger
+	waf    coraza.WAF
+	logger *zerolog.Logger
 }
 
-func (a *application) HandleRequest(id string, req *applicationRequest) error {
-
+func (a *application) HandleRequest(req *applicationRequest) error {
+	id := req.id
+	if id == "" {
+		return fmt.Errorf("request id is empty")
+	}
 	tx := a.waf.NewTransactionWithID(id)
 	tx.ProcessConnection(req.srcIp.String(), int(req.srcPort), req.dstIp.String(), int(req.dstPort))
 	url := strings.Builder{}
@@ -58,7 +62,11 @@ func (a *application) HandleRequest(id string, req *applicationRequest) error {
 	if it := tx.ProcessRequestHeaders(); it != nil {
 		return ErrInterrupted{it}
 	}
-
+	if it, _, err := tx.WriteRequestBody(req.body); it != nil {
+		return ErrInterrupted{it}
+	} else if err != nil {
+		return err
+	}
 	if it, err := tx.ProcessRequestBody(); it != nil {
 		return ErrInterrupted{it}
 	} else if err != nil {
@@ -67,11 +75,44 @@ func (a *application) HandleRequest(id string, req *applicationRequest) error {
 	if a.logger.GetLevel() == zerolog.DebugLevel {
 		a.logger.Debug().Msg(req.String())
 	}
+	if !a.ResponseCheck {
+		tx.ProcessLogging()
+		tx.Close()
+		return nil
+	} else {
+		cache.Add(tx, time.Duration(a.TransactionTTLMs*time.Millisecond))
+	}
 
 	return nil
 }
 
-func (a *application) HandleResponse(id string, msg *message.Message) error {
+func (a *application) HandleResponse(res *applicationResponse) error {
+	id := res.id
+	if id == "" {
+		return fmt.Errorf("response id is empty")
+	}
+	tx, ok := cache.Get(id)
+	if !ok {
+		return fmt.Errorf("transaction %s not found", id)
+	}
+	if err := readHeaders(res.headers, func(key, value string) {
+		tx.AddResponseHeader(key, value)
+	}); err != nil {
+		return err
+	}
+	if it := tx.ProcessResponseHeaders(int(res.status), "HTTP/"+res.version); it != nil {
+		return ErrInterrupted{it}
+	}
+	tx.WriteResponseBody(res.body)
+	if it, err := tx.ProcessResponseBody(); it != nil {
+		return ErrInterrupted{it}
+	} else if err != nil {
+		return err
+	}
+	tx.ProcessLogging()
+	tx.Close()
+	// TODO does remove forces eviction?
+	cache.Remove(id)
 
 	return nil
 }
@@ -96,14 +137,32 @@ func (a *application) logCallback(mr types.MatchedRule) {
 }
 
 func newApplication(app *config.Application) (*application, error) {
+	// if no log settings are used, we inherit global settings
+	tmpLogger := getApps().logger
+	if tmpLogger == nil {
+		tmpLogger = &log.Logger
+	}
 	a := &application{
 		Application: *app,
-		logger:      zerolog.New(os.Stdout),
+		logger:      tmpLogger,
+	}
+
+	if app.LogFile != "" || app.LogLevel != "" {
+		logger, err := logger.New(app.LogLevel, app.LogFile)
+		if err != nil {
+			return nil, err
+		}
+		logger.Debug().Str("level", app.LogLevel).Str("app", app.Name).
+			Str("file", app.LogFile).Msg("application logger created")
+		a.logger = logger
+	} else {
+		a.logger.Info().Str("app", app.Name).Msg("application is inheriting parent logger")
 	}
 	config := coraza.NewWAFConfig().
 		WithDirectives(app.Directives).
 		WithErrorCallback(a.logCallback).
 		WithRootFS(merged_fs.NewMergedFS(coreruleset.FS, io.OSFS))
+	a.logger.Debug().Str("app", app.Name).Msg("WAF config created")
 	waf, err := coraza.NewWAF(config)
 	if err != nil {
 		return nil, err

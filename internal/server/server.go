@@ -13,12 +13,12 @@ import (
 
 func Serve(ctx context.Context, bind string, maxConnections int) error {
 	var connCount int32 = 0 // Atomic counter for connection limiting
-
 	listener, err := net.Listen("tcp4", bind)
 	if err != nil {
 		log.Printf("error create listener, %v", err)
 		os.Exit(1)
 	}
+
 	defer listener.Close()
 
 	// Goroutine for handling shutdown

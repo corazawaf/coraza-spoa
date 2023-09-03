@@ -15,25 +15,12 @@ max_connections: 5
 # The maximum number of transactions which can be cached
 transaction_active_limit: 1000
 
-# After reaching the maximum number of transactions:
-# If true then the new transactions will be rejected with deny and status code 503
-# If false, the new transaction will be processed, ignoring the response
-transaction_active_limit_reject: false
-
 # The log level configuration, one of: debug/info/warn/error/panic/fatal
 log_level: info
 # The log file path
 log_file: /dev/stdout
 # The log format, one of: console/json
 log_format: console
-
-# Include all files in the glob pattern
-# The files must be in YAML format
-# All configurations are loaded in alphabetical order
-# The configuration is merged with the global configuration
-# First the included configurations will be loaded
-# include: 
-#   - /etc/coraza-spoa/applications.d/*.yaml
 
 applications:
   # name is used as key to identify the directives
@@ -66,3 +53,8 @@ applications:
     log_level: info
     # The log file path
     log_file: /dev/stdout
+
+    # After reaching the maximum number of transactions:
+    # If true then the new transactions will be rejected with deny and status code 503
+    # If false, the new transaction will be processed, ignoring the response
+    transaction_active_limit_reject: false

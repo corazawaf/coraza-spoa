@@ -14,7 +14,8 @@ func TestNewApp(t *testing.T) {
 	setApps(newAppManager())
 	apps := getApps()
 	assert.NoError(t, apps.Add(&config.Application{
-		Name: "test",
+		Name:          "test",
+		ResponseCheck: true,
 		Directives: `
 		SecRuleEngine On
 		SecRule ARGS "@contains test" "id:1,phase:2,deny,status:403"`,
@@ -37,5 +38,20 @@ func TestNewApp(t *testing.T) {
 	assert.NoError(t, handler.handler(&req))
 
 	handler.Handler(&req)
-	// now we look for interruptions
+	// now we look for interruptions ...
+
+	msg = &message.Message{
+		Name: messageCorazaResponse,
+		KV:   kv.NewKV(),
+	}
+	msg.KV.Add("app", "test")
+	msg.KV.Add("id", "test_id")
+	msg.KV.Add("headers", "Content-Type: application/json")
+	messages = &message.Messages{
+		msg,
+	}
+	req = request.Request{
+		Messages: messages,
+	}
+	assert.NoError(t, handler.handler(&req))
 }
