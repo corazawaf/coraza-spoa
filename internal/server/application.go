@@ -40,21 +40,21 @@ type application struct {
 }
 
 func (a *application) HandleRequest(req *applicationRequest) error {
-	id := req.id
+	id := req.ID
 	if id == "" {
 		return fmt.Errorf("request id is empty")
 	}
 	tx := a.waf.NewTransactionWithID(id)
-	tx.ProcessConnection(req.srcIp.String(), int(req.srcPort), req.dstIp.String(), int(req.dstPort))
+	tx.ProcessConnection(req.SrcIp.String(), int(req.SrcPort), req.DstIp.String(), int(req.DstPort))
 	url := strings.Builder{}
-	url.WriteString(req.path)
-	if req.query != "" {
-		url.Grow(len(req.query) + 1)
+	url.WriteString(req.Path)
+	if req.Query != "" {
+		url.Grow(len(req.Query) + 1)
 		url.WriteString("?")
-		url.WriteString(req.query)
+		url.WriteString(req.Query)
 	}
-	tx.ProcessURI(url.String(), req.method, "HTTP/"+req.version)
-	if err := readHeaders(req.headers, func(key, value string) {
+	tx.ProcessURI(url.String(), req.Method, "HTTP/"+req.Version)
+	if err := readHeaders(req.Headers, func(key, value string) {
 		tx.AddRequestHeader(key, value)
 	}); err != nil {
 		return err
@@ -62,7 +62,7 @@ func (a *application) HandleRequest(req *applicationRequest) error {
 	if it := tx.ProcessRequestHeaders(); it != nil {
 		return ErrInterrupted{it}
 	}
-	if it, _, err := tx.WriteRequestBody(req.body); it != nil {
+	if it, _, err := tx.WriteRequestBody(req.Body); it != nil {
 		return ErrInterrupted{it}
 	} else if err != nil {
 		return err
@@ -87,7 +87,7 @@ func (a *application) HandleRequest(req *applicationRequest) error {
 }
 
 func (a *application) HandleResponse(res *applicationResponse) error {
-	id := res.id
+	id := res.ID
 	if id == "" {
 		return fmt.Errorf("response id is empty")
 	}
@@ -95,15 +95,15 @@ func (a *application) HandleResponse(res *applicationResponse) error {
 	if !ok {
 		return fmt.Errorf("transaction %s not found", id)
 	}
-	if err := readHeaders(res.headers, func(key, value string) {
+	if err := readHeaders(res.Headers, func(key, value string) {
 		tx.AddResponseHeader(key, value)
 	}); err != nil {
 		return err
 	}
-	if it := tx.ProcessResponseHeaders(int(res.status), "HTTP/"+res.version); it != nil {
+	if it := tx.ProcessResponseHeaders(int(res.Status), "HTTP/"+res.Version); it != nil {
 		return ErrInterrupted{it}
 	}
-	tx.WriteResponseBody(res.body)
+	tx.WriteResponseBody(res.Body)
 	if it, err := tx.ProcessResponseBody(); it != nil {
 		return ErrInterrupted{it}
 	} else if err != nil {

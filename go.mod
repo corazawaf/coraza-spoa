@@ -31,7 +31,6 @@ require (
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.6.0
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20230723190514-7bdcbcff3d5a
 	github.com/corazawaf/libinjection-go v0.1.2 // indirect
 	github.com/negasus/haproxy-spoe-go v1.0.5

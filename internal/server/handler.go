@@ -64,7 +64,7 @@ func (h handler) handler(req *request.Request) error {
 		req := requestPool.Get().(*applicationRequest)
 		defer requestPool.Put(req)
 
-		if err := req.Fill(msg); err != nil {
+		if err := unmarshalMessage(msg, req); err != nil {
 			return err
 		}
 		err = a.HandleRequest(req)
@@ -72,7 +72,7 @@ func (h handler) handler(req *request.Request) error {
 		res := responsePool.Get().(*applicationResponse)
 		defer responsePool.Put(req)
 
-		if err := res.Fill(msg); err != nil {
+		if err := unmarshalMessage(msg, res); err != nil {
 			return err
 		}
 		err = a.HandleResponse(res)

@@ -9,6 +9,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type test struct {
+	Name   string `spoa:"name"`
+	Number int    `spoa:"number"`
+	IP     net.IP `spoa:"ip"`
+}
+
+func TestApplicationMessage(t *testing.T) {
+	msg := message.Message{
+		Name: "test",
+		KV:   kv.NewKV(),
+	}
+	msg.KV.Add("name", "test")
+	msg.KV.Add("number", int64(1234))
+	msg.KV.Add("ip", net.ParseIP("127.0.0.1"))
+	tt := &test{}
+	assert.NoError(t, unmarshalMessage(&msg, tt))
+	assert.Equal(t, "test", tt.Name)
+	assert.Equal(t, 1234, tt.Number)
+	assert.Equal(t, net.ParseIP("127.0.0.1"), tt.IP)
+}
+
 func TestApplicationRequest(t *testing.T) {
 	msg := &message.Message{
 		Name: messageCorazaRequest,
@@ -28,19 +49,11 @@ func TestApplicationRequest(t *testing.T) {
 	msg.KV.Add("body", []byte("test=test"))
 	req := requestPool.Get().(*applicationRequest)
 	defer requestPool.Put(req)
-	assert.NoError(t, req.Fill(msg))
-
-	t.Run("invalid message key should fail", func(t *testing.T) {
-		msg.KV.Add("false_error", "test")
-		req2 := requestPool.Get().(*applicationRequest)
-		defer requestPool.Put(req2)
-		assert.Error(t, req2.Fill(msg))
-	})
-
-	assert.Equal(t, "test", req.app)
+	assert.NoError(t, unmarshalMessage(msg, req))
+	assert.Equal(t, "test", req.App)
 
 	t.Run("headers should be parsed", func(t *testing.T) {
-		assert.NoError(t, readHeaders(req.headers, func(key, value string) {
+		assert.NoError(t, readHeaders(req.Headers, func(key, value string) {
 			assert.Equal(t, "Host", key)
 			assert.Equal(t, "localhost", value)
 		}))
