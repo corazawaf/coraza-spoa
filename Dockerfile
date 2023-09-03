@@ -53,7 +53,7 @@ HEALTHCHECK --interval=10s --timeout=2s --retries=2 CMD "/usr/bin/socat /dev/nul
 
 ENTRYPOINT ["tini", "--", "/docker-entrypoint.sh"]
 
-CMD ["/usr/bin/coraza-spoa", "--config", "/etc/coraza-spoa/config.yaml"]
+CMD ["/usr/bin/coraza-spoa", "-f", "/etc/coraza-spoa/config.yaml"]
 
 # ---
 FROM main AS coreruleset

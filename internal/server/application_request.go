@@ -54,6 +54,7 @@ func (r *applicationRequest) Fill(msg *message.Message) error {
 		case *int64:
 			*p = v.Value.(int64)
 		case *net.IP:
+			// we validate the interface is [4]byte
 			*p = v.Value.(net.IP)
 		case *[]byte:
 			*p = v.Value.([]byte)
