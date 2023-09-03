@@ -12,7 +12,7 @@ services:
       target: coreruleset
   haproxy:
     restart: unless-stopped
-    image: haproxy:2.7-alpine
+    image: haproxy:2.9-alpine
     ports: [ "4000:80", "4443:443", "4001:4001" ]
     links:
       - "coraza:coraza"

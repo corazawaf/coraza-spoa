@@ -31,17 +31,21 @@ applications:
     # and copy crs-setup.conf & the rules, plugins directories to /etc/coraza-spoa
     # Also the built-in OWASP CRS rules are available in @owasp_crs/
     directives: |
-      Include @coraza.conf-recommended
-      SecRuleEngine On
-      SecAction \
-          "id:900990,\
-          phase:1,\
-          pass,\
-          t:none,\
-          nolog,\
-          setvar:tx.crs_setup_version=400"
-      SecDefaultAction "phase:1,log,noauditlog,deny,status:403"
-      Include @owasp_crs/*.conf
+      # Include @coraza.conf-recommended
+      # SecRuleEngine On
+      # SecAction \
+      #     "id:900990,\
+      #     phase:1,\
+      #     pass,\
+      #     t:none,\
+      #     nolog,\
+      #     setvar:tx.crs_setup_version=400"
+      # SecDefaultAction "phase:1,log,noauditlog,deny,status:403"
+      # Include @owasp_crs/*.conf
+      Include /etc/coraza-spoa/coraza.conf
+      Include /etc/coraza-spoa/crs-setup.conf
+      Include /etc/coraza-spoa/rules/*.conf
+
 
     # HAProxy configured to send requests only, that means no cache required
     response_check: false

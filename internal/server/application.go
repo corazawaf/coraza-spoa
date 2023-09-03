@@ -5,8 +5,6 @@ import (
 	"strings"
 	"time"
 
-	coreruleset "github.com/corazawaf/coraza-coreruleset"
-	"github.com/corazawaf/coraza-coreruleset/io"
 	"github.com/corazawaf/coraza-spoa/internal/cache"
 	"github.com/corazawaf/coraza-spoa/internal/config"
 	"github.com/corazawaf/coraza-spoa/internal/logger"
@@ -14,7 +12,6 @@ import (
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/yalue/merged_fs"
 )
 
 type ErrInterrupted struct {
@@ -160,8 +157,8 @@ func newApplication(app *config.Application) (*application, error) {
 	}
 	config := coraza.NewWAFConfig().
 		WithDirectives(app.Directives).
-		WithErrorCallback(a.logCallback).
-		WithRootFS(merged_fs.NewMergedFS(coreruleset.FS, io.OSFS))
+		WithErrorCallback(a.logCallback) //.WithRootFS(merged_fs.NewMergedFS(coreruleset.FS, io.OSFS))
+		// TODO for some reason it is failing with the merged fs
 	a.logger.Debug().Str("app", app.Name).Msg("WAF config created")
 	waf, err := coraza.NewWAF(config)
 	if err != nil {
