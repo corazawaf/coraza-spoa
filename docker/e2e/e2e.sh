@@ -8,6 +8,7 @@
 HAPROXY_HOST=${HAPROXY_HOST:-"localhost:4000"}
 HTTPBIN_HOST=${HTTPBIN_HOST:-"localhost:8080"}
 HAPROXY_LOGS='/haproxy/hap.log'
+CURL_MAX_TIME=${CURL_MAX_TIME:-"2"}
 
 [[ "${DEBUG}" == "true" ]] && set -x
 
@@ -33,7 +34,7 @@ function wait_for_service() {
     local url=${1}
     local max=${2}
     while [[ "${status_code}" -ne "200" ]]; do
-      status_code=$(curl --write-out "%{http_code}" --silent --output /dev/null "${url}")
+      status_code=$(curl --max-time "${CURL_MAX_TIME}" --write-out "%{http_code}" --silent --output /dev/null "${url}")
       sleep 1
       echo -ne "[Wait] Waiting for response from ${url}. Timeout: ${max}s   \r"
       ((max-=1))
@@ -53,7 +54,7 @@ function wait_for_service() {
 function check_status() {
     local url=${1}
     local status=${2}
-    local args=("${@:3}" --write-out '%{http_code}' --silent --output /dev/null)
+    local args=("${@:3}" --max-time "${CURL_MAX_TIME}" --write-out '%{http_code}' --silent --output /dev/null)
     status_code=$(curl "${args[@]}" "${url}")
     if [[ "${status_code}" -ne ${status} ]] ; then
       echo "[Fail] Unexpected response with code ${status_code} from ${url}"
@@ -70,7 +71,7 @@ function check_status() {
 function check_body() {
     local url=${1}
     local empty=${2}
-    local args=("${@:3}" --silent)
+    local args=("${@:3}" --silent --max-time "${CURL_MAX_TIME}")
     response_body=$(curl "${args[@]}" "${url}")
     if [[ "${empty}" == "true" ]] && [[ -n "${response_body}" ]]; then
       echo -e "[Fail] Unexpected response with a body. Body dump:\n${response_body}"
