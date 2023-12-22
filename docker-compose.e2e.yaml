@@ -10,6 +10,15 @@ services:
       target: coreruleset
     volumes:
       - ./docker/e2e/e2e-rules.conf:/etc/coraza-spoa/rules/000-e2e-rules.conf
+      - cor:/var/log/coraza-spoa
+    ports:
+      - 9000:9000
+    command:
+      [
+        "sh",
+        "-c",
+        "/usr/bin/coraza-spoa --config /etc/coraza-spoa/config.yaml 2>&1 | tee /var/log/coraza-spoa/coraza.log"
+      ]
   haproxy:
     depends_on:
       - coraza
@@ -19,12 +28,9 @@ services:
       [
         "sh",
         "-c",
-        "haproxy -f /usr/local/etc/haproxy/haproxy.cfg | tee /var/lib/haproxy/hap.log"
+        "haproxy -d -f /usr/local/etc/haproxy/haproxy.cfg 2>&1 | tee /var/lib/haproxy/hap.log"
       ]
-    ports: [ "4000:80" ]
-    links:
-      - "coraza:coraza"
-      - "httpbin:httpbin"
+    ports: [ "4000:4000" ]
     volumes:
       - type: bind
         source: ./docker/haproxy
@@ -34,13 +40,12 @@ services:
     depends_on:
       - haproxy
       - coraza
-    links:
-      - "haproxy:haproxy"
-      - "httpbin:httpbin"
     build:
       context: docker/e2e
       dockerfile: ./Dockerfile.curl
     volumes:
       - hap:/haproxy
+      - cor:/coraza
 volumes:
   hap:
+  cor:

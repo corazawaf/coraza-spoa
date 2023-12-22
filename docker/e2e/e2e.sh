@@ -8,6 +8,7 @@
 HAPROXY_HOST=${HAPROXY_HOST:-"localhost:4000"}
 HTTPBIN_HOST=${HTTPBIN_HOST:-"localhost:8080"}
 HAPROXY_LOGS='/haproxy/hap.log'
+CORAZA_LOGS='/coraza/coraza.log'
 CURL_MAX_TIME=${CURL_MAX_TIME:-"2"}
 
 [[ "${DEBUG}" == "true" ]] && set -x
@@ -25,6 +26,17 @@ trueNegativeBodyPayload="This is a payload"
 truePositiveBodyPayload="maliciouspayload"
 trueNegativeBodyPayloadForResponseBody="Hello world"
 truePositiveBodyPayloadForResponseBody="responsebodycode"
+
+
+# print_logs prints haproxy and coraza logs
+function print_logs() {
+    echo ' ---------------------- haproxy ---------------------'
+    cat "${HAPROXY_LOGS}"
+    echo ' ---------------------- coraza ---------------------'
+    cat "${CORAZA_LOGS}"
+}
+trap print_logs EXIT
+
 
 # wait_for_service waits until the given URL returns a 200 status code.
 # $1: The URL to send requests to.

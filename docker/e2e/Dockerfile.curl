@@ -10,7 +10,7 @@ RUN apk add --no-cache bash
 
 COPY ./e2e.sh /workspace/e2e.sh
 
-ENV HAPROXY_HOST=haproxy:80
+ENV HAPROXY_HOST=haproxy:4000
 ENV HTTPBIN_HOST=httpbin:8080
 
 CMD ["bash", "/workspace/e2e.sh"]
