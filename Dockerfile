@@ -1,7 +1,7 @@
 # Copyright 2023 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
 
-FROM --platform=$BUILDPLATFORM golang:1.19-alpine3.17 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.21-alpine3.18 AS builder
 
 WORKDIR /build
 COPY . /build
@@ -20,16 +20,16 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     OS=${TARGETOS} ARCH=${TARGETARCH} make
 
 # ---
-FROM alpine:3.17 AS main
+FROM alpine:3.18 AS main
 
 ARG TARGETARCH
 
 LABEL org.opencontainers.image.authors="The OWASP Coraza contributors" \
-      org.opencontainers.image.description="OWASP Coraza WAF (Haproxy SPOA)" \
-      org.opencontainers.image.documentation="https://coraza.io/connectors/coraza-spoa/" \
-      org.opencontainers.image.licenses="Apache-2.0" \
-      org.opencontainers.image.source="https://github.com/corazawaf/coraza-spoa" \
-      org.opencontainers.image.title="coraza-spoa"
+    org.opencontainers.image.description="OWASP Coraza WAF (Haproxy SPOA)" \
+    org.opencontainers.image.documentation="https://coraza.io/connectors/coraza-spoa/" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.source="https://github.com/corazawaf/coraza-spoa" \
+    org.opencontainers.image.title="coraza-spoa"
 
 RUN apk add --no-cache tini socat ca-certificates \
     && update-ca-certificates
@@ -53,7 +53,7 @@ HEALTHCHECK --interval=10s --timeout=2s --retries=2 CMD "/usr/bin/socat /dev/nul
 
 ENTRYPOINT ["tini", "--", "/docker-entrypoint.sh"]
 
-CMD ["/usr/bin/coraza-spoa", "--config", "/etc/coraza-spoa/config.yaml"]
+CMD ["/usr/bin/coraza-spoa", "-f", "/etc/coraza-spoa/config.yaml"]
 
 # ---
 FROM main AS coreruleset

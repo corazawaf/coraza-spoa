@@ -11,4 +11,4 @@ if [ $# -gt 0 ] && [ "$1" = "${1#-}" ]; then
     exit
 fi
 
-exec coraza-spoa --config /etc/coraza-spoa/config.yaml
+exec coraza-spoa -f /etc/coraza-spoa/config.yaml

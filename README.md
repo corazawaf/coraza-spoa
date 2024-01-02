@@ -27,7 +27,7 @@ When you need to re-compile the source code, you can use the command `make clean
 The example configuration file is [config.yaml.default](https://github.com/corazawaf/coraza-spoa/blob/main/config.yaml.default), you can copy it and modify the related configuration information. You can start the service by running the command:
 
 ```
-coraza-spoa -config /etc/coraza-spoa/coraza.yaml
+coraza-spoa -f /etc/coraza-spoa/coraza.yaml
 ```
 
 You will also want to download & extract the [OWASP Core Ruleset]( https://github.com/coreruleset/coreruleset/releases) (version 4+ supported) to the `/etc/coraza-spoa` directory.

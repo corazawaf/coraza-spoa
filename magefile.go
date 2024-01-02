@@ -19,8 +19,8 @@ import (
 
 var addLicenseVersion = "v1.0.0" // https://github.com/google/addlicense
 // TODO: Use recent version (for example v1.53.2) to run on Go 1.20 (https://github.com/golangci/golangci-lint/pull/3414)
-var golangCILintVer = "v1.48.0"  // https://github.com/golangci/golangci-lint/releases
-var gosImportsVer = "v0.1.5"     // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
+var golangCILintVer = "v1.48.0" // https://github.com/golangci/golangci-lint/releases
+var gosImportsVer = "v0.1.5"    // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
 
 var errRunGoModTidy = errors.New("go.mod/sum not formatted, commit changes")
 var errNoGitDir = errors.New("no .git directory found")
@@ -69,8 +69,34 @@ func Test() error {
 	if err := sh.RunV("go", "test", "./..."); err != nil {
 		return err
 	}
-
 	return nil
+}
+
+func Build() error {
+	// get --with-wasilibs flag
+	/*
+		wasilibs := false
+		for _, arg := range os.Args {
+			if arg == "--with-wasilibs" {
+				wasilibs = true
+				break
+			}
+		}*/
+	if err := sh.RunV("go", "build", "-o", "build/coraza-spoa", "./cmd/coraza-spoa"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Coverage runs tests with coverage and race detector enabled.
+func Coverage() error {
+	if err := os.MkdirAll("build", 0755); err != nil {
+		return err
+	}
+	if err := sh.RunV("go", "test", "-race", "-coverprofile=build/coverage.txt", "-covermode=atomic", "-coverpkg=./...", "./..."); err != nil {
+		return err
+	}
+	return sh.RunV("go", "tool", "cover", "-html=build/coverage.txt", "-o", "build/coverage.html")
 }
 
 // Precommit installs a git hook to run check when committing
