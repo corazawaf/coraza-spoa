@@ -32,7 +32,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		messageCorazaResponse = "coraza-res"
 	)
 
-	var messageHandler func(*Application, context.Context, *encoding.Message) error
+	var messageHandler func(*Application, context.Context, *encoding.ActionWriter, *encoding.Message) error
 	switch name := string(message.NameBytes()); name {
 	case messageCorazaRequest:
 		messageHandler = (*Application).HandleRequest
@@ -65,7 +65,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		return
 	}
 
-	err := messageHandler(app, ctx, message)
+	err := messageHandler(app, ctx, writer, message)
 	if err == nil {
 		return
 	}
