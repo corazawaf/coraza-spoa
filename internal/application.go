@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"net/netip"
 	"strings"
 	"time"
@@ -26,7 +27,6 @@ type Application struct {
 }
 
 type applicationRequest struct {
-	ID      string
 	SrcIp   netip.Addr
 	SrcPort int64
 	DstIp   netip.Addr
@@ -39,15 +39,13 @@ type applicationRequest struct {
 	Body    []byte
 }
 
-func (a *Application) HandleRequest(ctx context.Context, message *encoding.Message) error {
+func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) error {
 	k := encoding.AcquireKVEntry()
 	defer encoding.ReleaseKVEntry(k)
 
 	var req applicationRequest
 	for message.KV.Next(k) {
 		switch name := string(k.NameBytes()); name {
-		case "id":
-			req.ID = string(k.ValueBytes())
 		case "src-ip":
 			req.SrcIp = k.ValueAddr()
 		case "src-port":
@@ -98,13 +96,19 @@ func (a *Application) HandleRequest(ctx context.Context, message *encoding.Messa
 		}
 	}
 
-	if req.ID == "" {
-		return fmt.Errorf("request id is empty")
+	const idLength = 16
+	var sb strings.Builder
+	sb.Grow(idLength)
+	for i := 0; i < idLength; i++ {
+		sb.WriteRune(rune('A' + rand.Intn(26)))
 	}
 
-	tx := a.waf.NewTransactionWithID(req.ID)
+	tx := a.waf.NewTransactionWithID(sb.String())
 	// write transaction as early as possible to prevent cache misses
 	a.cache.SetWithExpiration(tx.ID(), tx, a.TransactionTTLMs*time.Millisecond)
+	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
+		return err
+	}
 
 	tx.ProcessConnection(req.SrcIp.String(), int(req.SrcPort), req.DstIp.String(), int(req.DstPort))
 
@@ -178,7 +182,7 @@ type applicationResponse struct {
 	Body    []byte
 }
 
-func (a *Application) HandleResponse(ctx context.Context, message *encoding.Message) error {
+func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) error {
 	if !a.ResponseCheck {
 		return fmt.Errorf("got response but response check is disabled")
 	}

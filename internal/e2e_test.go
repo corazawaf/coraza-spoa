@@ -76,9 +76,6 @@ func withCoraza(t *testing.T, f func(*testing.T, testutil.HAProxyConfig, string)
 		EngineAddr:   l.Addr().String(),
 		FrontendPort: fmt.Sprintf("%d", testutil.TCPPort(t)),
 		CustomFrontendConfig: `
-    unique-id-format %[uuid()]
-    unique-id-header X-Unique-ID
-
     # Currently haproxy cannot use variables to set the code or deny_status, so this needs to be manually configured here
     http-request redirect code 302 location %[var(txn.e2e.data)] if { var(txn.e2e.action) -m str redirect }
     http-response redirect code 302 location %[var(txn.e2e.data)] if { var(txn.e2e.action) -m str redirect }
@@ -113,11 +110,11 @@ spoe-agent e2e
     log         global
 
 spoe-message coraza-req
-    args app=str(default) id=unique-id src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
+    args app=str(default) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
     event on-frontend-http-request
 
 spoe-message coraza-res
-    args app=str(default) id=unique-id version=res.ver status=status headers=res.hdrs body=res.body
+    args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body
     event on-http-response
 `,
 		BackendConfig: fmt.Sprintf(`
