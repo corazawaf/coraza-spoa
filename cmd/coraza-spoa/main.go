@@ -11,33 +11,60 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 
 	"github.com/corazawaf/coraza-spoa/internal"
 )
 
+var configPath string
+var globalLogger = zerolog.New(os.Stderr).With().Timestamp().Logger()
+
 func main() {
+	flag.StringVar(&configPath, "config", "", "configuration file")
 	flag.Parse()
 
-	log.Info().Msg("Starting coraza-spoa")
-	//TODO START HERE
+	if configPath == "" {
+		globalLogger.Fatal().Msg("Configuration file is not set")
+	}
 
-	l, err := net.Listen("tcp", "127.0.0.1:8000")
+	cfg, err := readConfig()
 	if err != nil {
-		return
+		globalLogger.Fatal().Err(err).Msg("Failed loading config")
+	}
+
+	logger, err := cfg.Log.newLogger()
+	if err != nil {
+		globalLogger.Fatal().Err(err).Msg("Failed creating global logger")
+	}
+	globalLogger = logger
+
+	apps, err := cfg.newApplications()
+	if err != nil {
+		globalLogger.Fatal().Err(err).Msg("Failed creating applications")
+	}
+
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+
+	network, address := cfg.networkAddressFromBind()
+	l, err := (&net.ListenConfig{}).Listen(ctx, network, address)
+	if err != nil {
+		globalLogger.Fatal().Err(err).Msg("Failed opening socket")
 	}
 
 	a := &internal.Agent{
-		Context: context.Background(),
-		Applications: map[string]*internal.Application{
-			"default": {
-				ResponseCheck:    true,
-				TransactionTTLMs: 1000,
-			},
-		},
+		Context:      ctx,
+		Applications: apps,
+		Logger:       globalLogger,
 	}
+	go func() {
+		defer cancelFunc()
 
-	log.Print(a.Serve(l))
+		globalLogger.Info().Msg("Starting coraza-spoa")
+		if err := a.Serve(l); err != nil {
+			globalLogger.Fatal().Err(err).Msg("listener closed")
+		}
+	}()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGINT)
@@ -45,17 +72,43 @@ func main() {
 		sig := <-sigCh
 		switch sig {
 		case syscall.SIGTERM:
-			log.Info().Msg("Received SIGTERM, shutting down...")
+			globalLogger.Info().Msg("Received SIGTERM, shutting down...")
 			// this return will run cancel() and close the server
 			return
 		case syscall.SIGINT:
-			log.Info().Msg("Received SIGINT, shutting down...")
+			globalLogger.Info().Msg("Received SIGINT, shutting down...")
 			return
 		case syscall.SIGHUP:
-			log.Info().Msg("Received SIGHUP, reloading configuration...")
-			log.Error().Err(nil).Msg("Error loading configuration, using old configuration")
-		case syscall.SIGUSR1:
-			log.Info().Msg("SIGUSR1 received. Changing port is not supported yet")
+			globalLogger.Info().Msg("Received SIGHUP, reloading configuration...")
+
+			newCfg, err := readConfig()
+			if err != nil {
+				globalLogger.Error().Err(err).Msg("Error loading configuration, using old configuration")
+				continue
+			}
+
+			if cfg.Log != newCfg.Log {
+				newLogger, err := newCfg.Log.newLogger()
+				if err != nil {
+					globalLogger.Error().Err(err).Msg("Error creating new global logger, using old configuration")
+					continue
+				}
+				globalLogger = newLogger
+			}
+
+			if cfg.Bind != newCfg.Bind {
+				globalLogger.Error().Msg("Changing bind is not supported yet, using old configuration")
+				continue
+			}
+
+			apps, err := newCfg.newApplications()
+			if err != nil {
+				globalLogger.Error().Err(err).Msg("Error applying configuration, using old configuration")
+				continue
+			}
+
+			a.ReplaceApplications(apps)
+			cfg = newCfg
 		}
 	}
 }

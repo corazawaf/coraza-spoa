@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 	"github.com/dropmorepackets/haproxy-go/spop"
@@ -13,8 +14,9 @@ import (
 type Agent struct {
 	Context      context.Context
 	Applications map[string]*Application
+	Logger       zerolog.Logger
 
-	logger *zerolog.Logger
+	mtx sync.RWMutex
 }
 
 func (a *Agent) Serve(l net.Listener) error {
@@ -24,6 +26,12 @@ func (a *Agent) Serve(l net.Listener) error {
 	}
 
 	return agent.Serve(l)
+}
+
+func (a *Agent) ReplaceApplications(newApps map[string]*Application) {
+	a.mtx.Lock()
+	a.Applications = newApps
+	a.mtx.Unlock()
 }
 
 func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) {
@@ -39,14 +47,14 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	case messageCorazaResponse:
 		messageHandler = (*Application).HandleResponse
 	default:
-		a.logger.Debug().Str("message", name).Msg("unknown spoe message")
+		a.Logger.Debug().Str("message", name).Msg("unknown spoe message")
 		return
 	}
 
 	k := encoding.AcquireKVEntry()
 	defer encoding.ReleaseKVEntry(k)
 	if !message.KV.Next(k) {
-		a.logger.Panic().Msg("failed reading kv entry")
+		a.Logger.Panic().Msg("failed reading kv entry")
 		return
 	}
 
@@ -54,14 +62,16 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	if !k.NameEquals("app") {
 		// Without knowing the app, we cannot continue. We could fall back to a default application,
 		// but all following code would have to support that as we now already read one of the kv entries.
-		a.logger.Panic().Str("expected", "app").Str("got", appName).Msg("unexpected kv entry")
+		a.Logger.Panic().Str("expected", "app").Str("got", appName).Msg("unexpected kv entry")
 		return
 	}
 
+	a.mtx.RLock()
 	app := a.Applications[appName]
+	a.mtx.RUnlock()
 	if app == nil {
 		// If we cannot resolve the app, we fail as this is an invalid configuration.
-		a.logger.Panic().Str("app", appName).Msg("app not found")
+		a.Logger.Panic().Str("app", appName).Msg("app not found")
 		return
 	}
 
@@ -77,10 +87,10 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		_ = writer.SetString(encoding.VarScopeTransaction, "data", interruption.Interruption.Data)
 		_ = writer.SetInt64(encoding.VarScopeTransaction, "ruleid", int64(interruption.Interruption.RuleID))
 
-		a.logger.Debug().Err(err).Msg("sending interruption")
+		a.Logger.Debug().Err(err).Msg("sending interruption")
 		return
 	}
 
 	// If the error is not an ErrInterrupted, we panic to let the spop stream fail.
-	a.logger.Panic().Err(err).Msg("Error handling request")
+	a.Logger.Panic().Err(err).Msg("Error handling request")
 }

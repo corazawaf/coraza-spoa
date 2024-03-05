@@ -54,7 +54,14 @@ func withCoraza(t *testing.T, f func(*testing.T, testutil.HAProxyConfig, string)
 
 	logger := zerolog.New(os.Stderr)
 
-	application, err := NewApplication(&logger, directives)
+	appCfg := AppConfig{
+		Directives:       directives,
+		ResponseCheck:    true,
+		Logger:           logger,
+		TransactionTTLMS: 10000,
+	}
+
+	application, err := appCfg.NewApplication()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +71,7 @@ func withCoraza(t *testing.T, f func(*testing.T, testutil.HAProxyConfig, string)
 		Applications: map[string]*Application{
 			"default": application,
 		},
-		logger: &logger,
+		Logger: logger,
 	}
 
 	// create the listener synchronously to prevent a race
