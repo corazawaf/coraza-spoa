@@ -17,13 +17,18 @@ import (
 	"istio.io/istio/pkg/cache"
 )
 
-type Application struct {
-	waf    coraza.WAF
-	logger *zerolog.Logger
-	cache  cache.ExpiringCache
-
+type AppConfig struct {
+	Directives       string
 	ResponseCheck    bool
-	TransactionTTLMs time.Duration
+	Logger           zerolog.Logger
+	TransactionTTLMS time.Duration
+}
+
+type Application struct {
+	waf   coraza.WAF
+	cache cache.ExpiringCache
+
+	AppConfig
 }
 
 type applicationRequest struct {
@@ -92,7 +97,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 			// acquire a new kv entry to continue reading other message values.
 			k = encoding.AcquireKVEntry()
 		default:
-			a.logger.Debug().Str("name", name).Msg("unknown kv entry")
+			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
 	}
 
@@ -105,7 +110,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 
 	tx := a.waf.NewTransactionWithID(sb.String())
 	// write transaction as early as possible to prevent cache misses
-	a.cache.SetWithExpiration(tx.ID(), tx, a.TransactionTTLMs*time.Millisecond)
+	a.cache.SetWithExpiration(tx.ID(), tx, a.TransactionTTLMS*time.Millisecond)
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
 	}
@@ -216,7 +221,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			// acquire a new kv entry to continue reading other message values.
 			k = encoding.AcquireKVEntry()
 		default:
-			a.logger.Debug().Str("name", name).Msg("unknown kv entry")
+			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
 	}
 
@@ -259,27 +264,25 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	return tx.Close()
 }
 
-func NewApplication(logger *zerolog.Logger, directives string) (*Application, error) {
-	a := &Application{
-		logger:           logger,
-		ResponseCheck:    true,
-		TransactionTTLMs: 1000,
+func (a AppConfig) NewApplication() (*Application, error) {
+	app := Application{
+		AppConfig: a,
 	}
 
 	config := coraza.NewWAFConfig().
-		WithDirectives(directives).
-		WithErrorCallback(a.logCallback)
+		WithDirectives(a.Directives).
+		WithErrorCallback(app.logCallback)
 
 	waf, err := coraza.NewWAF(config)
 	if err != nil {
 		return nil, err
 	}
-	a.waf = waf
+	app.waf = waf
 
 	const defaultExpire = time.Second * 10
 	const defaultEvictionInterval = time.Second * 1
 
-	a.cache = cache.NewTTLWithCallback(defaultExpire, defaultEvictionInterval, func(key, value any) {
+	app.cache = cache.NewTTLWithCallback(defaultExpire, defaultEvictionInterval, func(key, value any) {
 		// everytime a transaction runs into a timeout it gets closed.
 		tx, ok := value.(types.Transaction)
 		if !ok {
@@ -289,11 +292,11 @@ func NewApplication(logger *zerolog.Logger, directives string) (*Application, er
 		// Process Logging won't do anything if TX was already logged.
 		tx.ProcessLogging()
 		if err := tx.Close(); err != nil {
-			a.logger.Error().Err(err).Str("tx", tx.ID()).Msg("error closing transaction")
+			a.Logger.Error().Err(err).Str("tx", tx.ID()).Msg("error closing transaction")
 		}
 	})
 
-	return a, nil
+	return &app, nil
 }
 
 func (a *Application) logCallback(mr types.MatchedRule) {
@@ -301,14 +304,14 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 
 	switch mr.Rule().Severity() {
 	case types.RuleSeverityWarning:
-		l = a.logger.Warn()
+		l = a.Logger.Warn()
 	case types.RuleSeverityNotice,
 		types.RuleSeverityInfo:
-		l = a.logger.Info()
+		l = a.Logger.Info()
 	case types.RuleSeverityDebug:
-		l = a.logger.Debug()
+		l = a.Logger.Debug()
 	default:
-		l = a.logger.Error()
+		l = a.Logger.Error()
 	}
 	l.Msg(mr.ErrorLog())
 }
