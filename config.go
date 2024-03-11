@@ -18,6 +18,7 @@ func readConfig() (*config, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer open.Close()
 
 	d := yaml.NewDecoder(open)
 	d.KnownFields(true)
