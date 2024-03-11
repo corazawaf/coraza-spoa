@@ -56,7 +56,7 @@ func Format() error {
 }
 
 func Build() error {
-	if err := sh.RunV("go", "build", "-o", "build/coraza-spoa", "./cmd/coraza-spoa"); err != nil {
+	if err := sh.RunV("go", "build", "-o", "build/coraza-spoa"); err != nil {
 		return err
 	}
 	return nil

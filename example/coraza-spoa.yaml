@@ -11,27 +11,12 @@ log_format: console
 applications:
   # name is used as key to identify the directives
   - name: sample_app
-    # Get the coraza.conf from https://github.com/corazawaf/coraza
-    #
-    # Download the OWASP CRS from https://github.com/coreruleset/coreruleset/releases
-    # and copy crs-setup.conf & the rules, plugins directories to /etc/coraza-spoa
-    # Also the built-in OWASP CRS rules are available in @owasp_crs/
+    # Some example rules.
+    # The built-in OWASP CRS rules are available in @owasp_crs/
     directives: |
-      # Include @coraza.conf-recommended
-      # SecRuleEngine On
-      # SecAction \
-      #     "id:900990,\
-      #     phase:1,\
-      #     pass,\
-      #     t:none,\
-      #     nolog,\
-      #     setvar:tx.crs_setup_version=400"
-      # SecDefaultAction "phase:1,log,noauditlog,deny,status:403"
-      # Include @owasp_crs/*.conf
-      Include /etc/coraza-spoa/coraza.conf
-      Include /etc/coraza-spoa/crs-setup.conf
-      Include /etc/coraza-spoa/rules/*.conf
-
+      Include @coraza.conf-recommended
+      Include @crs-setup.conf.example
+      Include @owasp_crs/*.conf
 
     # HAProxy configured to send requests only, that means no cache required
     response_check: false
