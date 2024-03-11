@@ -39,7 +39,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker metadata - Main
+      - name: Docker metadata
         id: meta-main
         uses: docker/metadata-action@v4
         with:
@@ -51,44 +51,14 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
 
-      - name: Image - Main
+      - name: Image
         uses: docker/build-push-action@v3
         with:
           context: .
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
-          file: Dockerfile
+          file: example/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-main.outputs.tags }}
           labels: ${{ steps.meta-main.outputs.labels }}
-
-
-      - name: Docker metadata - CRS4
-        id: meta-crs4
-        uses: docker/metadata-action@v4
-        with:
-          images: ghcr.io/${{ github.repository }}
-          flavor: |
-            suffix=-crs4,onlatest=true
-          tags: |
-            type=raw,value=snapshot,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=ref,event=pr
-
-      - name: Image - CRS4
-        uses: docker/build-push-action@v3
-        with:
-          context: .
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          platforms: linux/amd64
-          file: Dockerfile
-          push: ${{ github.event_name != 'pull_request' }}
-          target: coreruleset
-          build-args: |
-            CORERULESET_VERSION=v4.0.0-rc1
-          tags: ${{ steps.meta-crs4.outputs.tags }}
-          labels: ${{ steps.meta-crs4.outputs.labels }}

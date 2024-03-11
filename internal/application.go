@@ -10,9 +10,12 @@ import (
 	"strings"
 	"time"
 
+	coreruleset "github.com/corazawaf/coraza-coreruleset"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
+	"github.com/jcchavezs/mergefs"
+	"github.com/jcchavezs/mergefs/io"
 	"github.com/rs/zerolog"
 	"istio.io/istio/pkg/cache"
 )
@@ -271,7 +274,8 @@ func (a AppConfig) NewApplication() (*Application, error) {
 
 	config := coraza.NewWAFConfig().
 		WithDirectives(a.Directives).
-		WithErrorCallback(app.logCallback)
+		WithErrorCallback(app.logCallback).
+		WithRootFS(mergefs.Merge(coreruleset.FS, io.OSFS))
 
 	waf, err := coraza.NewWAF(config)
 	if err != nil {

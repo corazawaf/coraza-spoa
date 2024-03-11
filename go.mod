@@ -3,8 +3,10 @@ module github.com/corazawaf/coraza-spoa
 go 1.21
 
 require (
+	github.com/corazawaf/coraza-coreruleset v0.0.0-20240226094324-415b1017abdc
 	github.com/corazawaf/coraza/v3 v3.1.0
 	github.com/dropmorepackets/haproxy-go v0.0.5-0.20240218203010-94d697923f61
+	github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761
 	github.com/magefile/mage v1.15.0
 	github.com/mccutchen/go-httpbin/v2 v2.13.4
 	github.com/rs/zerolog v1.32.0
