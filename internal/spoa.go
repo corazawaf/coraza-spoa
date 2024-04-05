@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"io"
 
 	"github.com/bluele/gcache"
 	"github.com/corazawaf/coraza-spoa/config"
@@ -161,10 +162,21 @@ func New(conf *config.Config) (*SPOA, error) {
 		if err != nil {
 			level = zap.InfoLevel
 		}
-		f, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			return nil, err
+
+		var f io.Writer
+		switch cfg.LogFile {
+		case "/dev/stdout":
+			f = os.Stdout
+		case "/dev/stderr":
+			f = os.Stderr
+		default:
+			ff, err := os.OpenFile(cfg.LogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+			if err != nil {
+				return nil, err
+			}
+			f = ff
 		}
+
 		core := zapcore.NewTee(
 			zapcore.NewCore(fileEncoder, zapcore.AddSync(f), level),
 		)
