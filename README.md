@@ -70,7 +70,7 @@ backend coraza-spoa
     server s1 127.0.0.1:9000
 ```
 
-A comprehensive HAProxy configuration example can be found in [docs/config/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/coraza.cfg).
+A comprehensive HAProxy configuration example can be found in [docs/config/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/doc/config/haproxy.cfg).
 
 Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/88b4e54ab3ddcb58d946ed1d6389eff73745575b/doc/config/coraza.cfg#L14) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/dd5eb86d1e9abbdd5fe568249f36a6d85257eba7/doc/config/haproxy.cfg#L37):
 
