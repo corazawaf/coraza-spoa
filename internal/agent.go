@@ -62,7 +62,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	if !k.NameEquals("app") {
 		// Without knowing the app, we cannot continue. We could fall back to a default application,
 		// but all following code would have to support that as we now already read one of the kv entries.
-		a.Logger.Panic().Str("expected", "app").Str("got", appName).Msg("unexpected kv entry")
+		a.Logger.Panic().Str("expected", "app").Str("got", string(k.NameBytes())).Msg("unexpected kv entry")
 		return
 	}
 
