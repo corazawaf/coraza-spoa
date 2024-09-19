@@ -5,8 +5,10 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/corazawaf/coraza/v3/http/e2e"
@@ -27,6 +29,25 @@ func TestE2E(t *testing.T) {
 		if err != nil {
 			t.Fatalf("e2e tests failed: %v", err)
 		}
+	}))
+	t.Run("high request rate", withCoraza(t, func(t *testing.T, config testutil.HAProxyConfig, bin string) {
+		var wg sync.WaitGroup
+		for i := 0; i < 100; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < 10; i++ {
+					req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/get", http.NoBody)
+					req.Header.Set("coraza-e2e", "ok")
+					resp, _ := http.DefaultClient.Do(req)
+					if resp.StatusCode != http.StatusOK {
+						t.Error(resp.Status)
+					}
+				}
+			}()
+		}
+
+		wg.Wait()
 	}))
 }
 

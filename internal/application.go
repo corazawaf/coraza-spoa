@@ -49,7 +49,10 @@ type applicationRequest struct {
 
 func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) error {
 	k := encoding.AcquireKVEntry()
-	defer encoding.ReleaseKVEntry(k)
+	// run defer via anonymous function to not directly evaluate the arguments.
+	defer func() {
+		encoding.ReleaseKVEntry(k)
+	}()
 
 	var req applicationRequest
 	for message.KV.Next(k) {
@@ -67,7 +70,10 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		case "path":
 			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			defer encoding.ReleaseKVEntry(currK)
+			// run defer via anonymous function to not directly evaluate the arguments.
+			defer func() {
+				encoding.ReleaseKVEntry(currK)
+			}()
 
 			req.Path = currK.ValueBytes()
 
@@ -76,7 +82,10 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		case "query":
 			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			defer encoding.ReleaseKVEntry(currK)
+			// run defer via anonymous function to not directly evaluate the arguments.
+			defer func() {
+				encoding.ReleaseKVEntry(currK)
+			}()
 
 			req.Query = currK.ValueBytes()
 			// acquire a new kv entry to continue reading other message values.
@@ -86,7 +95,10 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		case "headers":
 			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			defer encoding.ReleaseKVEntry(currK)
+			// run defer via anonymous function to not directly evaluate the arguments.
+			defer func() {
+				encoding.ReleaseKVEntry(currK)
+			}()
 
 			req.Headers = currK.ValueBytes()
 			// acquire a new kv entry to continue reading other message values.
@@ -94,7 +106,10 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		case "body":
 			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			defer encoding.ReleaseKVEntry(currK)
+			// run defer via anonymous function to not directly evaluate the arguments.
+			defer func() {
+				encoding.ReleaseKVEntry(currK)
+			}()
 
 			req.Body = currK.ValueBytes()
 			// acquire a new kv entry to continue reading other message values.
@@ -196,7 +211,10 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}
 
 	k := encoding.AcquireKVEntry()
-	defer encoding.ReleaseKVEntry(k)
+	// run defer via anonymous function to not directly evaluate the arguments.
+	defer func() {
+		encoding.ReleaseKVEntry(k)
+	}()
 
 	var res applicationResponse
 	for message.KV.Next(k) {
@@ -210,7 +228,10 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		case "headers":
 			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			defer encoding.ReleaseKVEntry(currK)
+			// run defer via anonymous function to not directly evaluate the arguments.
+			defer func() {
+				encoding.ReleaseKVEntry(currK)
+			}()
 
 			res.Headers = currK.ValueBytes()
 			// acquire a new kv entry to continue reading other message values.
@@ -218,7 +239,10 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		case "body":
 			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			defer encoding.ReleaseKVEntry(currK)
+			// run defer via anonymous function to not directly evaluate the arguments.
+			defer func() {
+				encoding.ReleaseKVEntry(currK)
+			}()
 
 			res.Body = currK.ValueBytes()
 			// acquire a new kv entry to continue reading other message values.
