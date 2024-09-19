@@ -114,7 +114,7 @@ func Test() error {
 	}
 
 	// we specify the package to get streaming test output
-	if err := sh.RunV("go", "test", "-v", "-tags=e2e", "./internal"); err != nil {
+	if err := sh.RunV("go", "test", "-race", "-v", "-tags=e2e", "./internal"); err != nil {
 		return err
 	}
 
