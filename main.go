@@ -9,6 +9,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"runtime"
+	"runtime/pprof"
 	"syscall"
 
 	"github.com/rs/zerolog"
@@ -17,14 +19,30 @@ import (
 )
 
 var configPath string
+var cpuProfile string
+var memProfile string
 var globalLogger = zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 func main() {
+	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
+	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
 	flag.StringVar(&configPath, "config", "", "configuration file")
 	flag.Parse()
 
 	if configPath == "" {
 		globalLogger.Fatal().Msg("Configuration file is not set")
+	}
+
+	if cpuProfile != "" {
+		f, err := os.Create(cpuProfile)
+		if err != nil {
+			globalLogger.Fatal().Err(err).Msg("could not create CPU profile")
+		}
+		defer f.Close()
+		if err := pprof.StartCPUProfile(f); err != nil {
+			globalLogger.Fatal().Err(err).Msg("could not start CPU profile")
+		}
+		defer pprof.StopCPUProfile()
 	}
 
 	cfg, err := readConfig()
@@ -68,16 +86,17 @@ func main() {
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGINT)
+outer:
 	for {
 		sig := <-sigCh
 		switch sig {
 		case syscall.SIGTERM:
 			globalLogger.Info().Msg("Received SIGTERM, shutting down...")
 			// this return will run cancel() and close the server
-			return
+			break outer
 		case syscall.SIGINT:
 			globalLogger.Info().Msg("Received SIGINT, shutting down...")
-			return
+			break outer
 		case syscall.SIGHUP:
 			globalLogger.Info().Msg("Received SIGHUP, reloading configuration...")
 
@@ -109,6 +128,18 @@ func main() {
 
 			a.ReplaceApplications(apps)
 			cfg = newCfg
+		}
+	}
+
+	if memProfile != "" {
+		f, err := os.Create(memProfile)
+		if err != nil {
+			globalLogger.Fatal().Err(err).Msg("could not create memory profile")
+		}
+		defer f.Close()
+		runtime.GC()
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			globalLogger.Fatal().Err(err).Msg("could not write memory profile")
 		}
 	}
 }
