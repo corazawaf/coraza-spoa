@@ -133,16 +133,23 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		return err
 	}
 
-	tx.ProcessConnection(req.SrcIp.String(), int(req.SrcPort), req.DstIp.String(), int(req.DstPort))
-
-	url := strings.Builder{}
-	url.Write(req.Path)
-	if req.Query != nil {
-		url.WriteString("?")
-		url.Write(req.Query)
+	if tx.IsRuleEngineOff() {
+		a.Logger.Warn().Msg("Rule engine is Off, Coraza is not going to process any rule")
+		goto exit
 	}
 
-	tx.ProcessURI(url.String(), req.Method, "HTTP/"+req.Version)
+	tx.ProcessConnection(req.SrcIp.String(), int(req.SrcPort), req.DstIp.String(), int(req.DstPort))
+
+	{
+		url := strings.Builder{}
+		url.Write(req.Path)
+		if req.Query != nil {
+			url.WriteString("?")
+			url.Write(req.Query)
+		}
+
+		tx.ProcessURI(url.String(), req.Method, "HTTP/"+req.Version)
+	}
 
 	if err := readHeaders(req.Headers, tx.AddRequestHeader); err != nil {
 		return fmt.Errorf("reading headers: %v", err)
@@ -172,6 +179,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		return nil
 	}
 
+exit:
 	tx.ProcessLogging()
 	return tx.Close()
 }
@@ -264,6 +272,9 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	defer a.cache.Remove(res.ID)
 
 	tx := cv.(types.Transaction)
+	if tx.IsRuleEngineOff() {
+		goto exit
+	}
 
 	if err := readHeaders(res.Headers, tx.AddResponseHeader); err != nil {
 		return fmt.Errorf("reading headers: %v", err)
@@ -287,6 +298,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		return ErrInterrupted{it}
 	}
 
+exit:
 	tx.ProcessLogging()
 	return tx.Close()
 }
