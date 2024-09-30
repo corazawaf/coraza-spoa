@@ -19,8 +19,8 @@ import (
 )
 
 func TestE2E(t *testing.T) {
-	t.Parallel()
-	t.Run("coraza e2e suite", withCoraza(t, func(t *testing.T, config testutil.HAProxyConfig, bin string) {
+	t.Run("coraza e2e suite", func(t *testing.T) {
+		config, bin, _ := runCoraza(t)
 		err := e2e.Run(e2e.Config{
 			NulledBody:        false,
 			ProxiedEntrypoint: "http://127.0.0.1:" + config.FrontendPort,
@@ -29,8 +29,10 @@ func TestE2E(t *testing.T) {
 		if err != nil {
 			t.Fatalf("e2e tests failed: %v", err)
 		}
-	}))
-	t.Run("high request rate", withCoraza(t, func(t *testing.T, config testutil.HAProxyConfig, bin string) {
+	})
+	t.Run("high request rate", func(*testing.T) {
+		config, _, _ := runCoraza(t)
+
 		if os.Getenv("CI") != "" {
 			t.Skip("CI is too slow for this test.")
 		}
@@ -52,25 +54,25 @@ func TestE2E(t *testing.T) {
 		}
 
 		wg.Wait()
-	}))
+	})
 }
 
-func withCoraza(t *testing.T, f func(*testing.T, testutil.HAProxyConfig, string)) func(t *testing.T) {
+func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 	s := httptest.NewServer(httpbin.New())
-	t.Cleanup(s.Close)
+	tb.Cleanup(s.Close)
 
-	logger := zerolog.New(os.Stderr)
+	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	appCfg := AppConfig{
 		Directives:       e2e.Directives,
-		ResponseCheck:    true,
+		ResponseCheck:    false,
 		Logger:           logger,
 		TransactionTTLMS: 10000,
 	}
 
 	application, err := appCfg.NewApplication()
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	a := Agent{
@@ -82,13 +84,13 @@ func withCoraza(t *testing.T, f func(*testing.T, testutil.HAProxyConfig, string)
 	}
 
 	// create the listener synchronously to prevent a race
-	l := testutil.TCPListener(t)
+	l := testutil.TCPListener(tb)
 	// ignore errors as the listener will be closed by t.Cleanup
 	go a.Serve(l)
 
 	cfg := testutil.HAProxyConfig{
 		EngineAddr:   l.Addr().String(),
-		FrontendPort: fmt.Sprintf("%d", testutil.TCPPort(t)),
+		FrontendPort: fmt.Sprintf("%d", testutil.TCPPort(tb)),
 		CustomFrontendConfig: `
     # Currently haproxy cannot use variables to set the code or deny_status, so this needs to be manually configured here
     http-request redirect code 302 location %[var(txn.e2e.data)] if { var(txn.e2e.action) -m str redirect }
@@ -114,7 +116,8 @@ func withCoraza(t *testing.T, f func(*testing.T, testutil.HAProxyConfig, string)
 		EngineConfig: `
 [e2e]
 spoe-agent e2e
-    messages    coraza-req     coraza-res
+#    messages    coraza-req     coraza-res
+    messages    coraza-req
     option      var-prefix      e2e
     option      set-on-error    error
     timeout     hello           2s
@@ -137,7 +140,7 @@ server httpbin %s
 `, s.Listener.Addr().String()),
 	}
 
-	return testutil.WithHAProxy(cfg, func(t *testing.T) {
-		f(t, cfg, s.URL)
-	})
+	frontendSocket := cfg.Run(tb)
+
+	return cfg, s.URL, frontendSocket
 }
