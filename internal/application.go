@@ -127,8 +127,6 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 	}
 
 	tx := a.waf.NewTransactionWithID(sb.String())
-	// write transaction as early as possible to prevent cache misses
-	a.cache.SetWithExpiration(tx.ID(), tx, a.TransactionTTLMS*time.Millisecond)
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
 	}
@@ -173,9 +171,8 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		return ErrInterrupted{it}
 	}
 
-	//TODO: add request logging?
-
 	if a.ResponseCheck {
+		a.cache.SetWithExpiration(tx.ID(), tx, a.TransactionTTLMS*time.Millisecond)
 		return nil
 	}
 
