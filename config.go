@@ -68,10 +68,10 @@ func (c config) newApplications() (map[string]*internal.Application, error) {
 		}
 
 		appConfig := internal.AppConfig{
-			Logger:           logger,
-			Directives:       a.Directives,
-			ResponseCheck:    a.ResponseCheck,
-			TransactionTTLMS: time.Duration(a.TransactionTTLMS) * time.Millisecond,
+			Logger:         logger,
+			Directives:     a.Directives,
+			ResponseCheck:  a.ResponseCheck,
+			TransactionTTL: time.Duration(a.TransactionTTLMS) * time.Millisecond,
 		}
 
 		application, err := appConfig.NewApplication()

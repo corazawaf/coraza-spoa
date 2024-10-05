@@ -10,6 +10,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/corazawaf/coraza/v3/http/e2e"
 	"github.com/mccutchen/go-httpbin/v2/httpbin"
@@ -64,10 +65,10 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	appCfg := AppConfig{
-		Directives:       e2e.Directives,
-		ResponseCheck:    false,
-		Logger:           logger,
-		TransactionTTLMS: 10000,
+		Directives:     e2e.Directives,
+		ResponseCheck:  false,
+		Logger:         logger,
+		TransactionTTL: 10 * time.Second,
 	}
 
 	application, err := appCfg.NewApplication()

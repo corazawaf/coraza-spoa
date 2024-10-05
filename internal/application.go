@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"net/netip"
 	"strings"
+	"sync"
 	"time"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset"
@@ -21,10 +22,10 @@ import (
 )
 
 type AppConfig struct {
-	Directives       string
-	ResponseCheck    bool
-	Logger           zerolog.Logger
-	TransactionTTLMS time.Duration
+	Directives     string
+	ResponseCheck  bool
+	Logger         zerolog.Logger
+	TransactionTTL time.Duration
 }
 
 type Application struct {
@@ -32,6 +33,11 @@ type Application struct {
 	cache cache.ExpiringCache
 
 	AppConfig
+}
+
+type transaction struct {
+	tx types.Transaction
+	m  sync.Mutex
 }
 
 type applicationRequest struct {
@@ -47,7 +53,7 @@ type applicationRequest struct {
 	Body    []byte
 }
 
-func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) error {
+func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	k := encoding.AcquireKVEntry()
 	// run defer via anonymous function to not directly evaluate the arguments.
 	defer func() {
@@ -127,13 +133,25 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 	}
 
 	tx := a.waf.NewTransactionWithID(sb.String())
+	defer func() {
+		if err == nil && a.ResponseCheck {
+			a.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, a.TransactionTTL)
+			return
+		}
+
+		tx.ProcessLogging()
+		if err := tx.Close(); err != nil {
+			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
+		}
+	}()
+
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
 	}
 
 	if tx.IsRuleEngineOff() {
 		a.Logger.Warn().Msg("Rule engine is Off, Coraza is not going to process any rule")
-		goto exit
+		return nil
 	}
 
 	tx.ProcessConnection(req.SrcIp.String(), int(req.SrcPort), req.DstIp.String(), int(req.DstPort))
@@ -171,14 +189,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		return ErrInterrupted{it}
 	}
 
-	if a.ResponseCheck {
-		a.cache.SetWithExpiration(tx.ID(), tx, a.TransactionTTLMS*time.Millisecond)
-		return nil
-	}
-
-exit:
-	tx.ProcessLogging()
-	return tx.Close()
+	return nil
 }
 
 func readHeaders(headers []byte, callback func(key string, value string)) error {
@@ -210,7 +221,7 @@ type applicationResponse struct {
 	Body    []byte
 }
 
-func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) error {
+func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	if !a.ResponseCheck {
 		return fmt.Errorf("got response but response check is disabled")
 	}
@@ -263,12 +274,23 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 
 	cv, ok := a.cache.Get(res.ID)
 	if !ok {
-		return fmt.Errorf("transaction %q not found", res.ID)
+		return fmt.Errorf("transaction not found: %s", res.ID)
 	}
-	// TODO does remove forces eviction?
-	defer a.cache.Remove(res.ID)
+	a.cache.Remove(res.ID)
 
-	tx := cv.(types.Transaction)
+	t := cv.(*transaction)
+	if !t.m.TryLock() {
+		return fmt.Errorf("transaction is already being deleted: %s", res.ID)
+	}
+	tx := t.tx
+
+	defer func() {
+		tx.ProcessLogging()
+		if err := tx.Close(); err != nil {
+			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
+		}
+	}()
+
 	if tx.IsRuleEngineOff() {
 		goto exit
 	}
@@ -296,8 +318,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}
 
 exit:
-	tx.ProcessLogging()
-	return tx.Close()
+	return nil
 }
 
 func (a AppConfig) NewApplication() (*Application, error) {
@@ -321,15 +342,17 @@ func (a AppConfig) NewApplication() (*Application, error) {
 
 	app.cache = cache.NewTTLWithCallback(defaultExpire, defaultEvictionInterval, func(key, value any) {
 		// everytime a transaction runs into a timeout it gets closed.
-		tx, ok := value.(types.Transaction)
-		if !ok {
+		t := value.(*transaction)
+		if !t.m.TryLock() {
+			// We lost a race and the transaction is already somewhere in use.
+			a.Logger.Info().Str("tx", t.tx.ID()).Msg("eviction called on currently used transaction")
 			return
 		}
 
 		// Process Logging won't do anything if TX was already logged.
-		tx.ProcessLogging()
-		if err := tx.Close(); err != nil {
-			a.Logger.Error().Err(err).Str("tx", tx.ID()).Msg("error closing transaction")
+		t.tx.ProcessLogging()
+		if err := t.tx.Close(); err != nil {
+			a.Logger.Error().Err(err).Str("tx", t.tx.ID()).Msg("error closing transaction")
 		}
 	})
 
