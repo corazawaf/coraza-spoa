@@ -39,13 +39,11 @@ type config struct {
 	Bind         string    `yaml:"bind"`
 	Log          logConfig `yaml:",inline"`
 	Applications []struct {
-		Log                          logConfig `yaml:",inline"`
-		Name                         string    `yaml:"name"`
-		Directives                   string    `yaml:"directives"`
-		ResponseCheck                bool      `yaml:"response_check"`
-		TransactionTTLMS             int       `yaml:"transaction_ttl_ms"`
-		TransactionActiveLimit       int       `yaml:"transaction_active_limit"`
-		TransactionActiveLimitReject bool      `yaml:"transaction_active_limit_reject"`
+		Log              logConfig `yaml:",inline"`
+		Name             string    `yaml:"name"`
+		Directives       string    `yaml:"directives"`
+		ResponseCheck    bool      `yaml:"response_check"`
+		TransactionTTLMS int       `yaml:"transaction_ttl_ms"`
 	} `yaml:"applications"`
 }
 

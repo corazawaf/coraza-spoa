@@ -30,11 +30,3 @@ applications:
     log_file: /dev/stdout
     # The log format, one of: console/json
     log_format: console
-
-    # The maximum number of transactions which can be cached
-    transaction_active_limit: 1000
-
-    # After reaching the maximum number of transactions:
-    # If true then the new transactions will be rejected with deny and status code 503
-    # If false, the new transaction will be processed, ignoring the response
-    transaction_active_limit_reject: false
