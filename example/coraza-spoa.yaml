@@ -1,0 +1,32 @@
+# The SPOA server bind address
+bind: 0.0.0.0:9000
+
+# The log level configuration, one of: debug/info/warn/error/panic/fatal
+log_level: info
+# The log file path
+log_file: /dev/stdout
+# The log format, one of: console/json
+log_format: console
+
+applications:
+  # name is used as key to identify the directives
+  - name: sample_app
+    # Some example rules.
+    # The built-in OWASP CRS rules are available in @owasp_crs/
+    directives: |
+      Include @coraza.conf-recommended
+      Include @crs-setup.conf.example
+      Include @owasp_crs/*.conf
+
+    # HAProxy configured to send requests only, that means no cache required
+    response_check: false
+
+    # The transaction cache lifetime in milliseconds (60000ms = 60s)
+    transaction_ttl_ms: 60000
+
+    # The log level configuration, one of: debug/info/warn/error/panic/fatal
+    log_level: info
+    # The log file path
+    log_file: /dev/stdout
+    # The log format, one of: console/json
+    log_format: console

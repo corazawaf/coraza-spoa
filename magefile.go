@@ -1,4 +1,4 @@
-// Copyright 2022 The OWASP Coraza contributors
+// Copyright 2024 The OWASP Coraza contributors
 // SPDX-License-Identifier: Apache-2.0
 
 //go:build mage
@@ -11,25 +11,33 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
 
-var addLicenseVersion = "v1.0.0" // https://github.com/google/addlicense
-// TODO: Use recent version (for example v1.53.2) to run on Go 1.20 (https://github.com/golangci/golangci-lint/pull/3414)
-var golangCILintVer = "v1.48.0"  // https://github.com/golangci/golangci-lint/releases
-var gosImportsVer = "v0.1.5"     // https://github.com/rinchsan/gosimports/releases/tag/v0.1.5
-
-var errRunGoModTidy = errors.New("go.mod/sum not formatted, commit changes")
+var addLicenseVersion = "v1.1.1" // https://github.com/google/addlicense/releases
+var gosImportsVer = "v0.3.7"     // https://github.com/rinchsan/gosimports/releases
+var golangCILintVer = "v1.54.0"  // https://github.com/golangci/golangci-lint/releases
 var errNoGitDir = errors.New("no .git directory found")
+var errUpdateGeneratedFiles = errors.New("generated files need to be updated")
 
 // Format formats code in this repository.
 func Format() error {
+	if err := sh.RunV("go", "generate", "./..."); err != nil {
+		return err
+	}
+
 	if err := sh.RunV("go", "mod", "tidy"); err != nil {
 		return err
 	}
+
+	if err := sh.RunV("go", "work", "sync"); err != nil {
+		return err
+	}
+
 	// addlicense strangely logs skipped files to stderr despite not being erroneous, so use the long sh.Exec form to
 	// discard stderr too.
 	if _, err := sh.Exec(map[string]string{}, io.Discard, io.Discard, "go", "run", fmt.Sprintf("github.com/google/addlicense@%s", addLicenseVersion),
@@ -47,18 +55,53 @@ func Format() error {
 		".")
 }
 
+func Build() error {
+	if err := sh.RunV("go", "build", "-o", "build/coraza-spoa"); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Lint verifies code quality.
 func Lint() error {
+	if err := sh.RunV("go", "generate", "./..."); err != nil {
+		return err
+	}
+
+	if sh.Run("git", "diff", "--exit-code", "--", "'*.gen.go'") != nil {
+		return errUpdateGeneratedFiles
+	}
+
 	if err := sh.RunV("go", "run", fmt.Sprintf("github.com/golangci/golangci-lint/cmd/golangci-lint@%s", golangCILintVer), "run"); err != nil {
 		return err
 	}
 
-	if err := sh.RunV("go", "mod", "tidy"); err != nil {
+	if err := sh.RunV("go", "work", "sync"); err != nil {
 		return err
 	}
 
-	if sh.Run("git", "diff", "--exit-code", "go.mod", "go.sum") != nil {
-		return errRunGoModTidy
+	if err := filepath.WalkDir(".", func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() {
+			return nil
+		}
+
+		if _, err := os.Stat(filepath.Join(path, "go.mod")); err == nil {
+			cmd := exec.Command("go", "mod", "tidy")
+			cmd.Dir = path
+			out, err := cmd.CombinedOutput()
+			fmt.Printf(string(out))
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	return nil
@@ -70,7 +113,28 @@ func Test() error {
 		return err
 	}
 
+	// we specify the package to get streaming test output
+	if err := sh.RunV("go", "test", "-race", "-v", "-tags=e2e", "./internal"); err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// Coverage runs tests with coverage and race detector enabled.
+func Coverage() error {
+	if err := os.MkdirAll("build", 0755); err != nil {
+		return err
+	}
+	if err := sh.RunV("go", "test", "-race", "-coverprofile=build/coverage.txt", "-covermode=atomic", "-coverpkg=./...", "./..."); err != nil {
+		return err
+	}
+	return sh.RunV("go", "tool", "cover", "-html=build/coverage.txt", "-o", "build/coverage.html")
+}
+
+// Doc runs godoc, access at http://localhost:6060
+func Doc() error {
+	return sh.RunV("go", "run", "golang.org/x/tools/cmd/godoc@latest", "-http=:6060")
 }
 
 // Precommit installs a git hook to run check when committing
