@@ -1,0 +1,34 @@
+version: "3.9"
+services:
+  httpbin:
+    image: mccutchen/go-httpbin:v2.13.4
+    environment:
+      - MAX_BODY_SIZE=15728640 # 15 MiB
+    command: [ "/bin/go-httpbin", "-port", "8081" ]
+    ports:
+      - "8081:8081"
+
+  coraza-spoa:
+    restart: unless-stopped
+    build:
+      context: ..
+      dockerfile: ./example/Dockerfile
+    ports:
+      - "9000:9000"
+
+  haproxy:
+    restart: unless-stopped
+    image: haproxy:2.9-alpine
+    ports: [ "8080:80", "8443:443", "8082:8082"]
+    depends_on:
+      - httpbin
+    links:
+      - "coraza-spoa:coraza-spoa"
+      - "httpbin:httpbin"
+    volumes:
+      - type: bind
+        source: ./haproxy/
+        target: /usr/local/etc/haproxy
+    environment:
+      - BACKEND_HOST=httpbin:8081
+      - CORAZA_SPOA_HOST=coraza-spoa

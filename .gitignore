@@ -13,7 +13,5 @@
 *.out
 vendor/
 
-# local files
-config.yaml
-logs/
-rules/
+# Build output
+build/

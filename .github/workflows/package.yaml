@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         arch: [amd64, arm64]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
 
       - name: Print Go version and environment
@@ -38,17 +38,14 @@ jobs:
             echo "PACKAGE_VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_ENV
           fi
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt update && sudo apt -y install make pkg-config rubygems && sudo gem install fpm
 
-          # Download corazawaf/coraza/coraza.conf for distribution
-          curl https://raw.githubusercontent.com/corazawaf/coraza/v3.0.0/coraza.conf-recommended > coraza.conf
-
       - name: Build binary
-        run: VERSION=${PACKAGE_VERSION} ARCH=${{ matrix.arch }} make
+        run: VERSION=${PACKAGE_VERSION} GOARCH=${{ matrix.arch }} go run mage.go build
 
       - name: Build package
         run: |
@@ -62,11 +59,9 @@ jobs:
            --deb-systemd ./contrib/coraza-spoa.service \
            --deb-systemd-enable \
            --config-files /etc/coraza-spoa/config.yaml \
-           ./coraza-spoa_${{matrix.arch}}=/usr/bin/coraza-spoa \
-           ./doc/config/=/usr/share/doc/coraza-spoa/haproxy-config \
+           ./coraza-spoa=/usr/bin/coraza-spoa \
            ./LICENSE=/usr/share/doc/coraza-spoa/ \
-           ./config.yaml.default=/etc/coraza-spoa/config.yaml \
-           ./coraza.conf=/etc/coraza-spoa/coraza.conf
+           ./example/coraza-spoa.yaml=/etc/coraza-spoa/config.yaml
 
       ## Publish to the "testing" repo
       - name: Cloudsmith Push:debian/coraza-spoa-snapshots
