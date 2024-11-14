@@ -4,9 +4,9 @@ Documentation=https://www.coraza.io
 
 [Service]
 ExecStart=/usr/bin/coraza-spoa -config=/etc/coraza-spoa/config.yaml
-WorkingDirectory=/
+WorkingDirectory=/etc/coraza-spoa/
 Restart=always
-Type=exec
+Type=notify-reload
 User=coraza-spoa
 Group=coraza-spoa
 
@@ -45,7 +45,7 @@ InaccessiblePaths=-/opt
 InaccessiblePaths=-/srv
 #InaccessiblePaths=-/bin
 InaccessiblePaths=-/bin/bash
-inaccessiblepaths=-/bin/find
+InaccessiblePaths=-/bin/find
 InaccessiblePaths=-/bin/less
 InaccessiblePaths=-/bin/zcat
 InaccessiblePaths=-/bin/rm
