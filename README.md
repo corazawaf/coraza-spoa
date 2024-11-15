@@ -30,7 +30,7 @@ You will also want to download & extract the [OWASP Core Ruleset]( https://githu
 
 ## HAProxy SPOE
 
-Configure HAProxy to exchange messages with the SPOA. The example SPOE configuration file is [coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/coraza.cfg), you can copy it and modify the related configuration information. Default directory to place the config is `/etc/haproxy/coraza.cfg`.
+Configure HAProxy to exchange messages with the SPOA. The example SPOE configuration file is [coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg), you can copy it and modify the related configuration information. Default directory to place the config is `/etc/haproxy/coraza.cfg`.
 
 ```ini
 # /etc/haproxy/coraza.cfg
@@ -66,12 +66,12 @@ backend coraza-spoa
     server s1 127.0.0.1:9000
 ```
 
-A comprehensive HAProxy configuration example can be found in [example/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/coraza.cfg).
+A comprehensive HAProxy configuration example can be found in [example/haproxy/coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg).
 
-Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/coraza.cfg#L14) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy.cfg#L37):
+Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L14) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L37):
 
 ## Docker
 
-- Build the coraza-spoa image `docker compose build`
+- Build the coraza-spoa image `cd ./example ; docker compose build`
 - Run haproxy, coraza-spoa and a mock server `docker compose up`
 - Perform a request which gets blocked by the WAF: `curl http://localhost:4000/\?x\=/etc/passwd`
