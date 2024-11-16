@@ -31,7 +31,7 @@ func TestE2E(t *testing.T) {
 			t.Fatalf("e2e tests failed: %v", err)
 		}
 	})
-	t.Run("high request rate", func(*testing.T) {
+	t.Run("high request rate", func(t *testing.T) {
 		config, _, _ := runCoraza(t)
 
 		if os.Getenv("CI") != "" {
