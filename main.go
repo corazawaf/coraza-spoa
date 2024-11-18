@@ -13,7 +13,6 @@ import (
 	"runtime/pprof"
 	"syscall"
 
-	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/rs/zerolog"
 
 	"github.com/corazawaf/coraza-spoa/internal"
@@ -81,14 +80,13 @@ func main() {
 
 		globalLogger.Info().Msg("Starting coraza-spoa")
 
-		_, err := daemon.SdNotify(false, daemon.SdNotifyReady)
+		err := internal.SdNotifyReady()
 		if err != nil {
 			globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 		}
 
 		if err := a.Serve(l); err != nil {
 			globalLogger.Fatal().Err(err).Msg("listener closed")
-			_, _ = daemon.SdNotify(false, daemon.SdNotifyStopping)
 		}
 	}()
 
@@ -100,20 +98,10 @@ outer:
 		switch sig {
 		case syscall.SIGTERM:
 			globalLogger.Info().Msg("Received SIGTERM, shutting down...")
-
-			_, err := daemon.SdNotify(false, daemon.SdNotifyStopping)
-			if err != nil {
-				globalLogger.Error().Err(err).Msg("Failed notifying daemon")
-			}
 			// this return will run cancel() and close the server
 			break outer
 		case syscall.SIGINT:
 			globalLogger.Info().Msg("Received SIGINT, shutting down...")
-
-			_, err := daemon.SdNotify(false, daemon.SdNotifyStopping)
-			if err != nil {
-				globalLogger.Error().Err(err).Msg("Failed notifying daemon")
-			}
 			break outer
 		case syscall.SIGHUP:
 			globalLogger.Info().Msg("Received SIGHUP, reloading configuration...")
@@ -144,7 +132,7 @@ outer:
 				continue
 			}
 
-			_, err = daemon.SdNotify(false, daemon.SdNotifyReloading)
+			err = internal.SdNotifyReloading()
 			if err != nil {
 				globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 			}
@@ -152,11 +140,18 @@ outer:
 			a.ReplaceApplications(apps)
 			cfg = newCfg
 
-			_, err = daemon.SdNotify(false, daemon.SdNotifyReady)
+			err = internal.SdNotifyReady()
 			if err != nil {
 				globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 			}
 		}
+	}
+
+	globalLogger.Info().Msg("Stopping coraza-spoa")
+
+	err = internal.SdNotifyStopping()
+	if err != nil {
+		globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 	}
 
 	if memProfile != "" {
