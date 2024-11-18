@@ -1,7 +1,7 @@
 # Copyright 2023 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.21 as build
+FROM golang:1.23 as build
 
 WORKDIR /go/src/app
 COPY . .
@@ -23,4 +23,4 @@ LABEL org.opencontainers.image.authors="The OWASP Coraza contributors" \
 COPY --from=build /go/bin/coraza-spoa /
 COPY ./example/coraza-spoa.yaml /config.yaml
 
-CMD ["/coraza-spoa", "--config", "/config.yaml"]
+CMD ["/coraza-spoa", "-f", "/config.yaml"]
