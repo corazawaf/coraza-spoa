@@ -1,12 +1,17 @@
 [Unit]
 Description=Coraza WAF SPOA Daemon
 Documentation=https://www.coraza.io
+After=network.target
 
 [Service]
 ExecStart=/usr/bin/coraza-spoa -config=/etc/coraza-spoa/config.yaml
+ExecReload=/bin/kill -HUP $MAINPID
 WorkingDirectory=/etc/coraza-spoa/
 Restart=always
-Type=notify-reload
+Type=notify
+# notify-reload is pretty new and isn't available on debian 12
+#Type=notify-reload
+NotifyAccess=all
 User=coraza-spoa
 Group=coraza-spoa
 
@@ -105,7 +110,7 @@ InaccessiblePaths=-/usr/bin/htop
 InaccessiblePaths=-/usr/bin/ipcmk
 InaccessiblePaths=-/usr/bin/journalctl
 InaccessiblePaths=-/usr/bin/keyctl
-InaccessiblePaths=-/usr/bin/kill
+# InaccessiblePaths=-/usr/bin/kill
 InaccessiblePaths=-/usr/bin/killall
 InaccessiblePaths=-/usr/bin/ksh
 InaccessiblePaths=-/usr/bin/last
@@ -293,7 +298,7 @@ PrivateTmp=true
 
 RemoveIPC=true
 
-RestrictAddressFamilies=AF_INET AF_INET6
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 #RestrictNamespaces=uts ipc pid user cgroup
 
 SystemCallArchitectures=native
