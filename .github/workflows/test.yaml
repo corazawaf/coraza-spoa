@@ -40,4 +40,4 @@ jobs:
         run: go run mage.go build
 
       - name: Check config
-        run: ./coraza-spoa -c -f ./example/coraza-spoa.yaml
+        run: ./build/coraza-spoa -c -f ./example/coraza-spoa.yaml
