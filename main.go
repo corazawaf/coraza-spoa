@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -18,10 +19,19 @@ import (
 	"github.com/corazawaf/coraza-spoa/internal"
 )
 
+type SeverityHook struct{}
+
+func (h SeverityHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+	if level == zerolog.FatalLevel {
+		_ = SdNotify(SdNotifyStopping, fmt.Sprintf("%s%s", SdNotifyStatus, msg))
+	}
+}
+
 var configPath string
 var cpuProfile string
 var memProfile string
-var globalLogger = zerolog.New(os.Stderr).With().Timestamp().Logger()
+var hook SeverityHook
+var globalLogger = zerolog.New(os.Stderr).Hook(hook).With().Timestamp().Logger()
 
 func main() {
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
@@ -80,7 +90,7 @@ func main() {
 
 		globalLogger.Info().Msg("Starting coraza-spoa")
 
-		err := internal.SdNotifyReady()
+		err := SdNotify(SdNotifyReady)
 		if err != nil {
 			globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 		}
@@ -132,7 +142,7 @@ outer:
 				continue
 			}
 
-			err = internal.SdNotifyReloading()
+			err = SdNotify(SdNotifyReloading)
 			if err != nil {
 				globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 			}
@@ -140,7 +150,7 @@ outer:
 			a.ReplaceApplications(apps)
 			cfg = newCfg
 
-			err = internal.SdNotifyReady()
+			err = SdNotify(SdNotifyReady)
 			if err != nil {
 				globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 			}
@@ -149,7 +159,7 @@ outer:
 
 	globalLogger.Info().Msg("Stopping coraza-spoa")
 
-	err = internal.SdNotifyStopping()
+	err = SdNotify(SdNotifyStopping)
 	if err != nil {
 		globalLogger.Error().Err(err).Msg("Failed notifying daemon")
 	}
