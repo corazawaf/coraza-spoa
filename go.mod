@@ -1,6 +1,6 @@
 module github.com/corazawaf/coraza-spoa
 
-go 1.23.1
+go 1.22.9
 
 require (
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20240226094324-415b1017abdc
@@ -9,7 +9,6 @@ require (
 	github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761
 	github.com/magefile/mage v1.15.0
 	github.com/mccutchen/go-httpbin/v2 v2.14.0
-	github.com/pires/go-proxyproto v0.8.0
 	github.com/rs/zerolog v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
 	istio.io/istio v0.0.0-20240218163812-d80ef7b19049
