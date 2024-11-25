@@ -7,7 +7,7 @@ require (
 	github.com/corazawaf/coraza/v3 v3.2.2
 	github.com/dropmorepackets/haproxy-go v0.0.5
 	github.com/jcchavezs/mergefs v0.1.0
-	github.com/magefile/mage v1.15.1-0.20231118170541-2385abb49a1f
+	github.com/magefile/mage v1.15.1-0.20241124190125-32e01077f0aa
 	github.com/mccutchen/go-httpbin/v2 v2.15.0
 	github.com/rs/zerolog v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
