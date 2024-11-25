@@ -47,6 +47,11 @@ jobs:
       - name: Build binary
         run: VERSION=${PACKAGE_VERSION} GOARCH=${{ matrix.arch }} go run mage.go build
 
+      - name: Find where the binary lives
+        run: |
+          ls -la
+          find . -name "coraza-spoa"
+
       - name: Build package
         run: |
          fpm -s dir -t deb -a ${{ matrix.arch }} -n coraza-spoa -v $PACKAGE_VERSION  \
