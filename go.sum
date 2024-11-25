@@ -16,6 +16,8 @@ github.com/foxcpp/go-mockdns v1.1.0/go.mod h1:IhLeSFGed3mJIAXPH2aiRQB+kqz7oqu8ld
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761 h1:Wbw8wlehLICFiXFPmQjMnYkcC6qH4a0d1iNbp6md+tk=
 github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761/go.mod h1:BGD4X4tm4ZCbtShoISaG4Ama2L3NOq7y6cvuOxbYgzs=
+github.com/jcchavezs/mergefs v0.1.0 h1:7oteO7Ocl/fnfFMkoVLJxTveCjrsd//UB0j89xmnpec=
+github.com/jcchavezs/mergefs v0.1.0/go.mod h1:eRLTrsA+vFwQZ48hj8p8gki/5v9C2bFtHH5Mnn4bcGk=
 github.com/magefile/mage v1.15.0 h1:BvGheCMAsG3bWUDbZ8AyXXpCNwU9u5CB6sM+HNb9HYg=
 github.com/magefile/mage v1.15.0/go.mod h1:z5UZb/iS3GoOSn0JgWuiw7dxlurVYTu+/jHXqQg881A=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
