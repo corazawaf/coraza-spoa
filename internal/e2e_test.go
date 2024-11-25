@@ -31,7 +31,7 @@ func TestE2E(t *testing.T) {
 			t.Fatalf("e2e tests failed: %v", err)
 		}
 	})
-	t.Run("high request rate", func(*testing.T) {
+	t.Run("high request rate", func(t *testing.T) {
 		config, _, _ := runCoraza(t)
 
 		if os.Getenv("CI") != "" {
@@ -66,7 +66,7 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 
 	appCfg := AppConfig{
 		Directives:     e2e.Directives,
-		ResponseCheck:  false,
+		ResponseCheck:  true,
 		Logger:         logger,
 		TransactionTTL: 10 * time.Second,
 	}
@@ -117,8 +117,7 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 		EngineConfig: `
 [e2e]
 spoe-agent e2e
-#    messages    coraza-req     coraza-res
-    messages    coraza-req
+    messages    coraza-req     coraza-res
     option      var-prefix      e2e
     option      set-on-error    error
     timeout     hello           2s
