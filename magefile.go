@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -56,7 +57,12 @@ func Format() error {
 }
 
 func Build() error {
-	if err := sh.RunV("go", "build", "-o", "build/coraza-spoa"); err != nil {
+	arch := os.Getenv("ARCH")
+	if arch == "" {
+		arch = runtime.GOARCH
+	}
+
+	if err := sh.RunWith(map[string]string{"GOARCH": arch}, "go", "build", "-o", "build/coraza-spoa"); err != nil {
 		return err
 	}
 	return nil
