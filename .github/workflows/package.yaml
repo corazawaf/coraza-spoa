@@ -59,7 +59,7 @@ jobs:
            --deb-systemd ./contrib/coraza-spoa.service \
            --deb-systemd-enable \
            --config-files /etc/coraza-spoa/config.yaml \
-           ./coraza-spoa=/usr/bin/coraza-spoa \
+           ./build/coraza-spoa=/usr/bin/coraza-spoa \
            ./LICENSE=/usr/share/doc/coraza-spoa/ \
            ./example/coraza-spoa.yaml=/etc/coraza-spoa/config.yaml
 
