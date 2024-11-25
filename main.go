@@ -65,7 +65,7 @@ func main() {
 		globalLogger.Fatal().Err(err).Msg("Failed creating applications")
 	}
 
-	if checkMode == true {
+	if checkMode {
 		globalLogger.Info().Msg("Configuration file is valid")
 		os.Exit(0)
 	}
