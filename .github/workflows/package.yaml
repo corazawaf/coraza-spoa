@@ -4,7 +4,7 @@ name: Package Build
 on:
   push:
     branches:
-      - main
+      - '**'
     tags:
       - 'v*.*.*'
 
@@ -49,23 +49,23 @@ jobs:
 
       - name: Build package
         run: |
-         fpm -s dir -t deb -a ${{ matrix.arch }} -n coraza-spoa -v $PACKAGE_VERSION  \
-           --description "Coraza HAProxy SPOA" \
-           --url "https://www.coraza.io" \
-           --maintainer "OWASP Coraza Team" \
-           --license Apache-2.0 \
-           --vendor OWASP \
-           --after-install ./contrib/coraza-spoa.postinst \
-           --deb-systemd ./contrib/coraza-spoa.service \
-           --deb-systemd-enable \
-           --config-files /etc/coraza-spoa/config.yaml \
-           ./build/coraza-spoa=/usr/bin/coraza-spoa \
-           ./LICENSE=/usr/share/doc/coraza-spoa/ \
-           ./example/coraza-spoa.yaml=/etc/coraza-spoa/config.yaml
+          fpm -s dir -t deb -a ${{ matrix.arch }} -n coraza-spoa -v $PACKAGE_VERSION  \
+            --description "Coraza HAProxy SPOA" \
+            --url "https://www.coraza.io" \
+            --maintainer "OWASP Coraza Team" \
+            --license Apache-2.0 \
+            --vendor OWASP \
+            --after-install ./contrib/coraza-spoa.postinst \
+            --deb-systemd ./contrib/coraza-spoa.service \
+            --deb-systemd-enable \
+            --config-files /etc/coraza-spoa/config.yaml \
+            ./build/coraza-spoa=/usr/bin/coraza-spoa \
+            ./LICENSE=/usr/share/doc/coraza-spoa/ \
+            ./example/coraza-spoa.yaml=/etc/coraza-spoa/config.yaml
 
       ## Publish to the "testing" repo
       - name: Cloudsmith Push:debian/coraza-spoa-snapshots
-        if: ${{ github.ref_type == 'branch' }}
+        if: ${{ github.ref_type == 'branch' && github.ref_name == 'main' }}
         uses: cloudsmith-io/action@master
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
