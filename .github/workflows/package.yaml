@@ -12,9 +12,15 @@ jobs:
   build:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [ amd64, arm64 ]
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
       - name: Print Go version and environment
         id: vars
@@ -37,8 +43,6 @@ jobs:
           else
             echo "PACKAGE_VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_ENV
           fi
-
-      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
