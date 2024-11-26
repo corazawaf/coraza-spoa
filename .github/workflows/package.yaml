@@ -12,9 +12,13 @@ jobs:
   build:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [ amd64, arm64 ]
     runs-on: ubuntu-24.04
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
       - name: Print Go version and environment
         id: vars
