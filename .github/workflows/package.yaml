@@ -15,6 +15,8 @@ jobs:
         arch: [ amd64, arm64 ]
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -41,8 +43,6 @@ jobs:
           else
             echo "PACKAGE_VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_ENV
           fi
-
-      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
