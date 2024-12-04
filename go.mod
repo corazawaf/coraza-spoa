@@ -11,7 +11,7 @@ require (
 	github.com/mccutchen/go-httpbin/v2 v2.15.0
 	github.com/rs/zerolog v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
-	istio.io/istio v0.0.0-20240218163812-d80ef7b19049
+	istio.io/istio db0f197e7fef
 )
 
 require (
