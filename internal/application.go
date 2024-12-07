@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/netip"
@@ -26,6 +27,7 @@ type AppConfig struct {
 	ResponseCheck  bool
 	Logger         zerolog.Logger
 	TransactionTTL time.Duration
+	LogFormat      string
 }
 
 type Application struct {
@@ -370,6 +372,71 @@ func (a AppConfig) NewApplication() (*Application, error) {
 	return &app, nil
 }
 
+func matchedRuleErrorJson(mr types.MatchedRule) []byte {
+	type errorLog struct {
+		Client     string   `json:"client"`
+		File       string   `json:"file"`
+		Line       int      `json:"line"`
+		RuleID     int      `json:"rule_id"`
+		Revision   string   `json:"revision"`
+		Msg        string   `json:"msg"`
+		Data       string   `json:"data"`
+		Severity   string   `json:"severity"`
+		SeverityID int      `json:"severity_id"`
+		Version    string   `json:"version"`
+		Maturity   int      `json:"maturity"`
+		Accuracy   int      `json:"accuracy"`
+		Tags       []string `json:"tags"`
+		Server     string   `json:"server"`
+		URI        string   `json:"uri"`
+		UniqueID   string   `json:"unique_id"`
+		Disruptive bool     `json:"disruptive"`
+		PhaseID    int      `json:"phase_id"`
+		Phase      string   `json:"phase"`
+	}
+
+	r := mr.Rule()
+	j, _ := json.Marshal(errorLog{
+		File:       r.File(),
+		Line:       r.Line(),
+		RuleID:     r.ID(),
+		Revision:   r.Revision(),
+		Severity:   r.Severity().String(),
+		SeverityID: r.Severity().Int(),
+		Version:    r.Version(),
+		Maturity:   r.Maturity(),
+		Accuracy:   r.Accuracy(),
+		Tags:       r.Tags(),
+		Msg:        mr.Message(),
+		Data:       mr.Data(),
+		Client:     mr.ClientIPAddress(),
+		Server:     mr.ServerIPAddress(),
+		Disruptive: mr.Disruptive(),
+		URI:        mr.URI(),
+		UniqueID:   mr.TransactionID(),
+		PhaseID:    int(r.Phase()),
+		Phase:      phaseToString(r.Phase()),
+	})
+	return j
+}
+
+func phaseToString(phase types.RulePhase) string {
+	switch phase {
+	case types.PhaseRequestHeaders:
+		return "request-headers"
+	case types.PhaseRequestBody:
+		return "request-body"
+	case types.PhaseResponseHeaders:
+		return "response-headers"
+	case types.PhaseResponseBody:
+		return "response-body"
+	case types.PhaseLogging:
+		return "logging"
+	default:
+		return "unknown"
+	}
+}
+
 func (a *Application) logCallback(mr types.MatchedRule) {
 	var l *zerolog.Event
 
@@ -384,7 +451,12 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	default:
 		l = a.Logger.Error()
 	}
-	l.Msg(mr.ErrorLog())
+	switch a.LogFormat {
+	case "json":
+		l.RawJSON("match", matchedRuleErrorJson(mr)).Send()
+	default:
+		l.Msg(mr.ErrorLog())
+	}
 }
 
 type ErrInterrupted struct {
