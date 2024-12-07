@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/netip"
@@ -26,6 +27,7 @@ type AppConfig struct {
 	ResponseCheck  bool
 	Logger         zerolog.Logger
 	TransactionTTL time.Duration
+	LogFormat      string
 }
 
 type Application struct {
@@ -370,6 +372,50 @@ func (a AppConfig) NewApplication() (*Application, error) {
 	return &app, nil
 }
 
+func matchedRuleErrorJson(mr types.MatchedRule) []byte {
+	type errorLog struct {
+		Client     string   `json:"client"`
+		Server     string   `json:"server"`
+		Msg        string   `json:"msg"`
+		Data       string   `json:"data"`
+		URI        string   `json:"uri"`
+		File       string   `json:"file"`
+		Line       int      `json:"line"`
+		RuleID     int      `json:"rule_id"`
+		Revision   string   `json:"revision"`
+		SeverityID int      `json:"severity_id"`
+		Severity   string   `json:"severity"`
+		Version    string   `json:"version"`
+		Maturity   int      `json:"maturity"`
+		Accuracy   int      `json:"accuracy"`
+		Disruptive bool     `json:"disruptive"`
+		Tags       []string `json:"tags"`
+		UniqueID   string   `json:"unique_id"`
+	}
+
+	r := mr.Rule()
+	j, _ := json.Marshal(errorLog{
+		File:       r.File(),
+		Line:       r.Line(),
+		RuleID:     r.ID(),
+		Revision:   r.Revision(),
+		Severity:   r.Severity().String(),
+		SeverityID: r.Severity().Int(),
+		Version:    r.Version(),
+		Maturity:   r.Maturity(),
+		Accuracy:   r.Accuracy(),
+		Tags:       r.Tags(),
+		Msg:        mr.Message(),
+		Data:       mr.Data(),
+		Client:     mr.ClientIPAddress(),
+		Server:     mr.ServerIPAddress(),
+		Disruptive: mr.Disruptive(),
+		URI:        mr.URI(),
+		UniqueID:   mr.TransactionID(),
+	})
+	return j
+}
+
 func (a *Application) logCallback(mr types.MatchedRule) {
 	var l *zerolog.Event
 
@@ -384,7 +430,12 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	default:
 		l = a.Logger.Error()
 	}
-	l.Msg(mr.ErrorLog())
+	switch a.LogFormat {
+	case "json":
+		l.RawJSON("match", matchedRuleErrorJson(mr)).Send()
+	default:
+		l.Msg(mr.ErrorLog())
+	}
 }
 
 type ErrInterrupted struct {
