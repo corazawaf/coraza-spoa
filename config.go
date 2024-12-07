@@ -163,6 +163,7 @@ func (c config) newApplications() (map[string]*internal.Application, error) {
 			Logger:         logger,
 			Directives:     a.Directives,
 			ResponseCheck:  a.ResponseCheck,
+			LogFormat:      a.Log.Format,
 			TransactionTTL: time.Duration(a.TransactionTTLMS) * time.Millisecond,
 		}
 
