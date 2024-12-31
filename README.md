@@ -74,4 +74,4 @@ Because, in the SPOE configuration file (coraza.cfg), we declare to use the back
 
 - Build the coraza-spoa image `cd ./example ; docker compose build`
 - Run haproxy, coraza-spoa and a mock server `docker compose up`
-- Perform a request which gets blocked by the WAF: `curl http://localhost:4000/\?x\=/etc/passwd`
+- Perform a request which gets blocked by the WAF: `curl http://localhost:8081/\?x\=/etc/passwd`
