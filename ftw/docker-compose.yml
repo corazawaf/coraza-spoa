@@ -1,0 +1,53 @@
+---
+
+services:
+  coraza-spoa:
+    build:
+      context: ..
+      dockerfile: ./ftw/Dockerfile.coraza_spoa
+      network: host
+    volumes:
+     - ../build:/var/log/coraza-spoa:rw
+    ports:
+      - 9000:9000
+
+  haproxy-log:
+    image: alpine:3.21
+    command:
+      - /bin/sh
+      - -c
+      - touch /var/log/haproxy/ftw-haproxy.log && chmod 777 /var/log/haproxy/ftw-haproxy.log
+    volumes:
+      - ../build:/var/log/haproxy:rw
+
+  haproxy:
+    depends_on:
+      - haproxy-log
+    image: haproxy:3.1-alpine
+    links:
+      - coraza-spoa:coraza-spoa
+    volumes:
+      - type: bind
+        source: ./haproxy/
+        target: /usr/local/etc/haproxy
+      - ../build:/var/log/haproxy:rw
+    command:
+      - /bin/sh
+      - -c
+      - haproxy -f /usr/local/etc/haproxy/haproxy.cfg > /var/log/haproxy/ftw-haproxy.log
+    ports:
+      - 8080:8080
+
+  ftw:
+    depends_on:
+      - coraza-spoa
+      - haproxy
+    build:
+      context: .
+      dockerfile: Dockerfile.ftw
+      network: host
+    environment:
+      - FTW_CLOUDMODE
+      - FTW_INCLUDE
+    volumes:
+      - ../build:/build
