@@ -28,6 +28,17 @@ coraza-spoa -f /etc/coraza-spoa/coraza-spoa.yaml
 
 You will also want to download & extract the [OWASP Core Ruleset]( https://github.com/coreruleset/coreruleset/releases) (version 4+ supported) to the `/etc/coraza-spoa` directory.
 
+### Validate Configuration
+To validate the configuration, you can pass the `--check` or the short `-c` flag, which just loads the configuration and exits.
+
+```shell
+# long version
+coraza-spoa --check --config /etc/coraza-spoa/coraza.yaml
+
+# short parameters
+coraza-spoa -c -f /etc/coraza-spoa/coraza.yaml
+```
+
 ## HAProxy SPOE
 
 Configure HAProxy to exchange messages with the SPOA. The example SPOE configuration file is [coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg), you can copy it and modify the related configuration information. Default directory to place the config is `/etc/haproxy/coraza.cfg`.
