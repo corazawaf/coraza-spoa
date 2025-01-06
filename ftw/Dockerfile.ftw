@@ -3,10 +3,13 @@
 
 FROM ghcr.io/coreruleset/go-ftw:1.1.2
 
-RUN apk update && apk add curl jq
+RUN apk update && apk add curl
 
 WORKDIR /workspace
 
+# TODOs:
+# - update when new CRS version is tagged: https://github.com/coreruleset/coreruleset/archive/refs/tags/v4.5.0.tar.gz
+# - keep it aligned with the github.com/corazawaf/coraza-coreruleset/v4 dependency version used
 ENV CRS_VERSION=4.5.0
 
 ADD https://github.com/coreruleset/coreruleset/archive/refs/tags/v${CRS_VERSION}.tar.gz /workspace/coreruleset/
