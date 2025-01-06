@@ -9,6 +9,10 @@ applications:
   - name: ftw
     directives: |
       Include @coraza.conf-recommended
+      # log details on failures
+      SecAuditLog /build/ftw-audit.log
+      SecAuditLogRelevantStatus "^(?:5)"
+
       # FTW config
       SecDefaultAction "phase:3,log,auditlog,pass"
       SecDefaultAction "phase:4,log,auditlog,pass"
