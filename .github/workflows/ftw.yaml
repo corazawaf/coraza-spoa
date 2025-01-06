@@ -1,0 +1,30 @@
+---
+
+name: FTW Test
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Run regression tests (ftw)
+        run: go run mage.go ftw
+
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: ftw-haproxy-spoa-logs
+          path: |
+            build/ftw.log
+            build/ftw-spoa.log
+            build/ftw-haproxy.log

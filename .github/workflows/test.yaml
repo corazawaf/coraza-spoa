@@ -25,15 +25,3 @@ jobs:
 
       - name: Test
         run: go run mage.go test
-
-      - name: Run regression tests (ftw)
-        run: go run mage.go ftw
-
-      - uses: actions/upload-artifact@v4
-        if: success() || failure()
-        with:
-          name: ftw-haproxy-spoa-logs
-          path: |
-            build/ftw.log
-            build/ftw-spoa.log
-            build/ftw-haproxy.log
