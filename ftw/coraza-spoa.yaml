@@ -2,7 +2,7 @@
 
 bind: 0.0.0.0:9000
 log_level: info
-log_file: /var/log/coraza-spoa/ftw-spoa.log
+log_file: /build/ftw-spoa.log
 log_format: console
 
 applications:
@@ -44,5 +44,5 @@ applications:
     response_check: false
     transaction_ttl_ms: 60000
     log_level: error  # Printing only logs at error level to reduce what ftw has to parse
-    log_file: /var/log/coraza-spoa/ftw.log
+    log_file: /build/ftw.log
     log_format: console
