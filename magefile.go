@@ -171,6 +171,5 @@ func Ftw() error {
 		"FTW_INCLUDE":   os.Getenv("FTW_INCLUDE"),
 	}
 
-	task := "ftw"
-	return sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "run", "--rm", task)
+	return sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "run", "--rm", "ftw")
 }
