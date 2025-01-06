@@ -12,13 +12,6 @@ ENV CRS_VERSION=4.5.0
 ADD https://github.com/coreruleset/coreruleset/archive/refs/tags/v${CRS_VERSION}.tar.gz /workspace/coreruleset/
 RUN cd coreruleset && tar -xf v${CRS_VERSION}.tar.gz --strip-components 1
 
-# to dynamically pull latest CRS version:
-# RUN mkdir coreruleset && \
-#     export CRS_VERSION="$(curl https://api.github.com/repos/corazawaf/coraza-coreruleset/releases/latest 2>/dev/null | jq -r '.name')" && \
-#     curl -L -o coreruleset/crs.tar.gz "https://github.com/coreruleset/coreruleset/archive/refs/tags/${CRS_VERSION}.tar.gz" 2>/dev/null && \
-#     cd coreruleset && \
-#     tar -xzf crs.tar.gz --strip-components 1
-
 COPY ftw.yml /workspace/ftw.yml
 COPY tests.sh /workspace/tests.sh
 
