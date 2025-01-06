@@ -28,7 +28,6 @@ services:
      - ../build:/build:rw
     ports:
       - 9000:9000
-    restart: unless-stopped
 
   haproxy:
     depends_on:
