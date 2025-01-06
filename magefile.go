@@ -160,7 +160,7 @@ func Check() {
 
 // Ftw runs CRS regressions tests. Requires docker.
 func Ftw() error {
-	if err := sh.RunV("docker", "compose", "--file", "ftw/docker-compose.yml", "build", "--pull"); err != nil {
+	if err := sh.RunV("docker", "compose", "--file", "ftw/docker-compose.yml", "build", "--pull", "--no-cache"); err != nil {
 		return err
 	}
 	defer func() {
