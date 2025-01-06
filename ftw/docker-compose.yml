@@ -13,7 +13,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - rm -f /build/ftw* && touch /build/ftw.log /build/ftw-haproxy.log /build/ftw-haproxy.log && chmod 666 /build/ftw*
+      - rm -f /build/ftw* && touch /build/ftw.log /build/ftw-haproxy.log /build/ftw-haproxy.log /build/ftw-audit.log && chmod 666 /build/ftw*
     volumes:
       - ../build:/build:rw
 
