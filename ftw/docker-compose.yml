@@ -33,7 +33,7 @@ services:
     depends_on:
       - prepare-logs
       - backend
-    image: "haproxy:${FTW_HAPROXY_VERSION-3.1}-alpine"
+    image: "haproxy:${FTW_HAPROXY_VERSION-3.0}-alpine"
     links:
       - coraza-spoa:coraza-spoa
     volumes:

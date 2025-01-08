@@ -45,7 +45,7 @@ applications:
       Include @crs-setup.conf.example
       Include @owasp_crs/*.conf
 
-    response_check: false
+    response_check: true
     transaction_ttl_ms: 60000
     log_level: error  # Printing only logs at error level to reduce what ftw has to parse
     log_file: /build/ftw.log
