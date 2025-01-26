@@ -17,6 +17,7 @@ applications:
       Include @coraza.conf-recommended
       Include @crs-setup.conf.example
       Include @owasp_crs/*.conf
+      SecRuleEngine On
 
     # HAProxy configured to send requests only, that means no cache required
     response_check: false
