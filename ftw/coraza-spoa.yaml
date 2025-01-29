@@ -1,0 +1,52 @@
+---
+
+bind: 0.0.0.0:9000
+log_level: info
+log_file: /build/ftw-spoa.log
+log_format: console
+
+applications:
+  - name: ftw
+    directives: |
+      Include @coraza.conf-recommended
+      # log details on failures
+      SecAuditLog /build/ftw-audit.log
+      SecAuditLogRelevantStatus "^(?:5)"
+
+      # FTW config
+      SecDefaultAction "phase:3,log,auditlog,pass"
+      SecDefaultAction "phase:4,log,auditlog,pass"
+      SecDefaultAction "phase:5,log,auditlog,pass"
+      SecDebugLogLevel 3
+
+      SecAction "id:900005,\
+          phase:1,\
+          nolog,\
+          pass,\
+          ctl:ruleEngine=DetectionOnly,\
+          ctl:ruleRemoveById=910000,\
+          setvar:tx.blocking_paranoia_level=4,\
+          setvar:tx.crs_validate_utf8_encoding=1,\
+          setvar:tx.arg_name_length=100,\
+          setvar:tx.arg_length=400,\
+          setvar:tx.total_arg_length=64000,\
+          setvar:tx.max_num_args=255,\
+          setvar:tx.max_file_size=64100,\
+          setvar:tx.combined_file_sizes=65535"
+
+      SecRule REQUEST_HEADERS:X-CRS-Test "@rx ^.*$" "id:999999,\
+          phase:1,\
+          pass,\
+          t:none,\
+          log,\
+          msg:'X-CRS-Test %{MATCHED_VAR}',\
+          ctl:ruleRemoveById=1-999999"
+
+      Include @crs-setup.conf.example
+      Include @owasp_crs/*.conf
+
+    response_check: true
+    transaction_ttl_ms: 60000
+    log_level: error  # Printing only logs at error level to reduce what ftw has to parse
+    log_file: /build/ftw.log
+    log_format: console
