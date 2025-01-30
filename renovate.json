@@ -1,6 +1,14 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "local>corazawaf/renovate-config"
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "istio.io/istio"
+      ],
+      "enabled": false
+    }
   ]
 }
