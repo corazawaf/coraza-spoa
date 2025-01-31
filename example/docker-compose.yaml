@@ -1,7 +1,7 @@
 version: "3.9"
 services:
   httpbin:
-    image: mccutchen/go-httpbin:v2.15.0
+    image: mccutchen/go-httpbin:v2.15.0@sha256:24528cf5229d0b70065ac27e6c9e4d96f5452a84a3ce4433e56573c18d96827a
     environment:
       - MAX_BODY_SIZE=15728640 # 15 MiB
     command: [ "/bin/go-httpbin", "-port", "8081" ]
@@ -18,7 +18,7 @@ services:
 
   haproxy:
     restart: unless-stopped
-    image: haproxy:2.9-alpine
+    image: haproxy:2.9-alpine@sha256:b86b9bf0969420ab952508955b9bd97890d735160f7277d29c4f21c527bab706
     ports: [ "8080:80", "8443:443", "8082:8082"]
     depends_on:
       - httpbin
