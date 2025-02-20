@@ -18,7 +18,7 @@ services:
 
   haproxy:
     restart: unless-stopped
-    image: haproxy:2.9-alpine@sha256:b86b9bf0969420ab952508955b9bd97890d735160f7277d29c4f21c527bab706
+    image: haproxy:2.9-alpine@sha256:d1dc1b2b7af3962cae1705f598104122f69209d82271bb7015acc9cec513e4d3
     ports: [ "8080:80", "8443:443", "8082:8082"]
     depends_on:
       - httpbin
