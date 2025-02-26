@@ -86,9 +86,10 @@ func main() {
 	}
 
 	a := &internal.Agent{
-		Context:      ctx,
-		Applications: apps,
-		Logger:       globalLogger,
+		Context:            ctx,
+		DefaultApplication: cfg.DefaultApplication,
+		Applications:       apps,
+		Logger:             globalLogger,
 	}
 	go func() {
 		defer cancelFunc()

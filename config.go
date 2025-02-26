@@ -38,9 +38,10 @@ func readConfig() (*config, error) {
 }
 
 type config struct {
-	Bind         string    `yaml:"bind"`
-	Log          logConfig `yaml:",inline"`
-	Applications []struct {
+	Bind               string    `yaml:"bind"`
+	Log                logConfig `yaml:",inline"`
+	DefaultApplication string    `yaml:"default_application"`
+	Applications       []struct {
 		Log              logConfig `yaml:",inline"`
 		Name             string    `yaml:"name"`
 		Directives       string    `yaml:"directives"`
