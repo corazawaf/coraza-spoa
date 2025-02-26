@@ -1,3 +1,6 @@
+// Copyright 2025 The OWASP Coraza contributors
+// SPDX-License-Identifier: Apache-2.0
+
 //go:build e2e
 
 package internal
@@ -13,10 +16,9 @@ import (
 	"time"
 
 	"github.com/corazawaf/coraza/v3/http/e2e"
+	"github.com/dropmorepackets/haproxy-go/pkg/testutil"
 	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/rs/zerolog"
-
-	"github.com/dropmorepackets/haproxy-go/pkg/testutil"
 )
 
 func TestE2E(t *testing.T) {
@@ -77,7 +79,8 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 	}
 
 	a := Agent{
-		Context: context.Background(),
+		Context:            context.Background(),
+		DefaultApplication: "default",
 		Applications: map[string]*Application{
 			"default": application,
 		},
