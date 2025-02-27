@@ -8,6 +8,10 @@ log_file: /dev/stdout
 # The log format, one of: console/json
 log_format: console
 
+# The name of one of the apps from the application list,
+# which will be used as a fallback when the target app is not found
+# default_application: sample_app
+
 applications:
   # name is used as key to identify the directives
   - name: sample_app
