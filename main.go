@@ -21,12 +21,16 @@ import (
 var configPath string
 var cpuProfile string
 var memProfile string
+var checkMode bool
 var globalLogger = zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 func main() {
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
 	flag.StringVar(&configPath, "config", "", "configuration file")
+	flag.StringVar(&configPath, "f", "", "configuration file")
+	flag.BoolVar(&checkMode, "check", false, "check mode : only check config files and exit")
+	flag.BoolVar(&checkMode, "c", false, "check mode : only check config files and exit")
 	flag.Parse()
 
 	if configPath == "" {
@@ -59,6 +63,11 @@ func main() {
 	apps, err := cfg.newApplications()
 	if err != nil {
 		globalLogger.Fatal().Err(err).Msg("Failed creating applications")
+	}
+
+	if checkMode {
+		globalLogger.Info().Msg("Configuration file is valid")
+		os.Exit(0)
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
