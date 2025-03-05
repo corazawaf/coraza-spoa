@@ -23,4 +23,4 @@ LABEL org.opencontainers.image.authors="The OWASP Coraza contributors" \
 COPY --from=build /go/bin/coraza-spoa /
 COPY ./example/coraza-spoa.yaml /config.yaml
 
-CMD ["/coraza-spoa", "--config", "/config.yaml"]
+CMD ["/coraza-spoa", "-f", "/config.yaml"]
