@@ -21,6 +21,8 @@ github.com/dropmorepackets/haproxy-go v0.0.5 h1:a6aT2UrdS9MvV60ZLZnXFgi19jxRvVg/
 github.com/dropmorepackets/haproxy-go v0.0.5/go.mod h1:4a2AmmVjvg2zPNdizGZrMN8ZSUpj90U43VlcdbOIBnU=
 github.com/foxcpp/go-mockdns v1.1.0 h1:jI0rD8M0wuYAxL7r/ynTrCQQq0BVqfB99Vgk7DlmewI=
 github.com/foxcpp/go-mockdns v1.1.0/go.mod h1:IhLeSFGed3mJIAXPH2aiRQB+kqz7oqu8ld2qVbOu7Wk=
+github.com/fsnotify/fsnotify v1.8.0 h1:dAwr6QBTBZIkG8roQaJjGof0pp0EeF+tNV7YBP3F/8M=
+github.com/fsnotify/fsnotify v1.8.0/go.mod h1:8jBTzvmWwFyi3Pb8djgCCO5IBqzKJ/Jwo8TRcHyHii0=
 github.com/godbus/dbus/v5 v5.0.4/go.mod h1:xhWf0FNVPg57R7Z0UbKHbJfkEywrmjJnf7w5xrFpKfA=
 github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761 h1:Wbw8wlehLICFiXFPmQjMnYkcC6qH4a0d1iNbp6md+tk=
 github.com/jcchavezs/mergefs v0.0.0-20230503083351-07f27d256761/go.mod h1:BGD4X4tm4ZCbtShoISaG4Ama2L3NOq7y6cvuOxbYgzs=
