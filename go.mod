@@ -6,6 +6,7 @@ require (
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20240226094324-415b1017abdc
 	github.com/corazawaf/coraza/v3 v3.3.2
 	github.com/dropmorepackets/haproxy-go v0.0.5
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/jcchavezs/mergefs v0.1.0
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516
 	github.com/mccutchen/go-httpbin/v2 v2.16.1
@@ -16,7 +17,6 @@ require (
 
 require (
 	github.com/corazawaf/libinjection-go v0.2.2 // indirect
-	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/petar-dambovaliev/aho-corasick v0.0.0-20240411101913-e07a1f0e8eb4 // indirect
