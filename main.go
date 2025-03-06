@@ -9,24 +9,28 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"syscall"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 
 	"github.com/corazawaf/coraza-spoa/internal"
 )
 
 var configPath string
+var autoReload bool
 var cpuProfile string
 var memProfile string
 var globalLogger = zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 func main() {
+	flag.StringVar(&configPath, "config", "", "configuration file")
+	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
-	flag.StringVar(&configPath, "config", "", "configuration file")
 	flag.Parse()
 
 	if configPath == "" {
@@ -36,11 +40,11 @@ func main() {
 	if cpuProfile != "" {
 		f, err := os.Create(cpuProfile)
 		if err != nil {
-			globalLogger.Fatal().Err(err).Msg("could not create CPU profile")
+			globalLogger.Fatal().Err(err).Msg("Could not create CPU profile")
 		}
 		defer f.Close()
 		if err := pprof.StartCPUProfile(f); err != nil {
-			globalLogger.Fatal().Err(err).Msg("could not start CPU profile")
+			globalLogger.Fatal().Err(err).Msg("Could not start CPU profile")
 		}
 		defer pprof.StopCPUProfile()
 	}
@@ -80,7 +84,50 @@ func main() {
 
 		globalLogger.Info().Msg("Starting coraza-spoa")
 		if err := a.Serve(l); err != nil {
-			globalLogger.Fatal().Err(err).Msg("listener closed")
+			globalLogger.Fatal().Err(err).Msg("Listener closed")
+		}
+	}()
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		globalLogger.Fatal().Err(err).Msg("Failed to create fsnotify watcher")
+	}
+	defer watcher.Close()
+
+	// configmap mounts are symlinks
+	// so we have to watch the parent directory instead of the file itself
+	configDir := filepath.Dir(configPath)
+	err = watcher.Add(configDir)
+	if err != nil {
+		globalLogger.Fatal().Err(err).Msg("Failed to add config directory to fsnotify watcher")
+	}
+
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				// on configmap change, the directory symlink is recreated
+				// so we have to catch this event and readd the directory back to watcher
+				if event.Op == fsnotify.Remove {
+					globalLogger.Info().Msg("Config directory updated, reloading configuration...")
+					watcher.Remove(event.Name)
+					watcher.Add(configDir)
+					newCfg, err := cfg.reloadConfig(a)
+					if err != nil {
+						globalLogger.Error().Err(err).Msg("Failed to reload configuration, using old configuration")
+						continue
+					}
+					cfg = newCfg
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				globalLogger.Error().Err(err).Msg("Error watching config directory")
+			}
 		}
 	}()
 
@@ -99,34 +146,11 @@ outer:
 			break outer
 		case syscall.SIGHUP:
 			globalLogger.Info().Msg("Received SIGHUP, reloading configuration...")
-
-			newCfg, err := readConfig()
+			newCfg, err := cfg.reloadConfig(a)
 			if err != nil {
-				globalLogger.Error().Err(err).Msg("Error loading configuration, using old configuration")
+				globalLogger.Error().Err(err).Msg("Failed to reload configuration, using old configuration")
 				continue
 			}
-
-			if cfg.Log != newCfg.Log {
-				newLogger, err := newCfg.Log.newLogger()
-				if err != nil {
-					globalLogger.Error().Err(err).Msg("Error creating new global logger, using old configuration")
-					continue
-				}
-				globalLogger = newLogger
-			}
-
-			if cfg.Bind != newCfg.Bind {
-				globalLogger.Error().Msg("Changing bind is not supported yet, using old configuration")
-				continue
-			}
-
-			apps, err := newCfg.newApplications()
-			if err != nil {
-				globalLogger.Error().Err(err).Msg("Error applying configuration, using old configuration")
-				continue
-			}
-
-			a.ReplaceApplications(apps)
 			cfg = newCfg
 		}
 	}
@@ -134,12 +158,12 @@ outer:
 	if memProfile != "" {
 		f, err := os.Create(memProfile)
 		if err != nil {
-			globalLogger.Fatal().Err(err).Msg("could not create memory profile")
+			globalLogger.Fatal().Err(err).Msg("Could not create memory profile")
 		}
 		defer f.Close()
 		runtime.GC()
 		if err := pprof.WriteHeapProfile(f); err != nil {
-			globalLogger.Fatal().Err(err).Msg("could not write memory profile")
+			globalLogger.Fatal().Err(err).Msg("Could not write memory profile")
 		}
 	}
 }

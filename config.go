@@ -56,6 +56,33 @@ func (c config) networkAddressFromBind() (network string, address string) {
 	return "tcp", c.Bind
 }
 
+func (c *config) reloadConfig(a *internal.Agent) (*config, error) {
+	newCfg, err := readConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error loading configuration: %w", err)
+	}
+
+	if c.Log != newCfg.Log {
+		newLogger, err := newCfg.Log.newLogger()
+		if err != nil {
+			return nil, fmt.Errorf("error creating new global logger: %w", err)
+		}
+		globalLogger = newLogger
+	}
+
+	if c.Bind != newCfg.Bind {
+		return nil, fmt.Errorf("changing bind is not supported yet")
+	}
+
+	apps, err := newCfg.newApplications()
+	if err != nil {
+		return nil, fmt.Errorf("error applying configuration: %w", err)
+	}
+
+	a.ReplaceApplications(apps)
+	return newCfg, nil
+}
+
 func (c config) newApplications() (map[string]*internal.Application, error) {
 	allApps := make(map[string]*internal.Application)
 
