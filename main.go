@@ -113,8 +113,14 @@ func main() {
 				// so we have to catch this event and readd the directory back to watcher
 				if event.Op == fsnotify.Remove {
 					globalLogger.Info().Msg("Config directory updated, reloading configuration...")
-					watcher.Remove(event.Name)
-					watcher.Add(configDir)
+					err = watcher.Remove(configDir)
+					if err != nil {
+						globalLogger.Fatal().Err(err).Msg("Failed to remove config directory from fsnotify watcher")
+					}
+					err = watcher.Add(configDir)
+					if err != nil {
+						globalLogger.Fatal().Err(err).Msg("Failed to add config directory to fsnotify watcher")
+					}
 					newCfg, err := cfg.reloadConfig(a)
 					if err != nil {
 						globalLogger.Error().Err(err).Msg("Failed to reload configuration, using old configuration")
