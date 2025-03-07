@@ -9,12 +9,10 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"syscall"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 
 	"github.com/corazawaf/coraza-spoa/internal"
@@ -89,52 +87,9 @@ func main() {
 	}()
 
 	if autoReload {
-		watcher, err := fsnotify.NewWatcher()
-		if err != nil {
-			globalLogger.Fatal().Err(err).Msg("Failed to create fsnotify watcher")
-		}
-		defer watcher.Close()
-
-		// configmap mounts are symlinks
-		// so we have to watch the parent directory instead of the file itself
-		configDir := filepath.Dir(configPath)
-		err = watcher.Add(configDir)
-		if err != nil {
-			globalLogger.Fatal().Err(err).Msg("Failed to add config directory to fsnotify watcher")
-		}
-
 		go func() {
-			for {
-				select {
-				case event, ok := <-watcher.Events:
-					if !ok {
-						return
-					}
-					// on configmap change, the directory symlink is recreated
-					// so we have to catch this event and readd the directory back to watcher
-					if event.Op == fsnotify.Remove {
-						globalLogger.Info().Msg("Config directory updated, reloading configuration...")
-						err = watcher.Remove(configDir)
-						if err != nil {
-							globalLogger.Fatal().Err(err).Msg("Failed to remove config directory from fsnotify watcher")
-						}
-						err = watcher.Add(configDir)
-						if err != nil {
-							globalLogger.Fatal().Err(err).Msg("Failed to add config directory to fsnotify watcher")
-						}
-						newCfg, err := cfg.reloadConfig(a)
-						if err != nil {
-							globalLogger.Error().Err(err).Msg("Failed to reload configuration, using old configuration")
-							continue
-						}
-						cfg = newCfg
-					}
-				case err, ok := <-watcher.Errors:
-					if !ok {
-						return
-					}
-					globalLogger.Error().Err(err).Msg("Error watching config directory")
-				}
+			if err := cfg.watchConfig(a); err != nil {
+				globalLogger.Fatal().Err(err).Msg("Config watcher failed")
 			}
 		}()
 	}
