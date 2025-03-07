@@ -19,6 +19,7 @@ import (
 )
 
 var configPath string
+var validateConfig bool
 var autoReload bool
 var cpuProfile string
 var memProfile string
@@ -26,6 +27,7 @@ var globalLogger = zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 func main() {
 	flag.StringVar(&configPath, "config", "", "configuration file")
+	flag.BoolVar(&validateConfig, "validate", false, "validate configuration file and exit")
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
@@ -61,6 +63,11 @@ func main() {
 	apps, err := cfg.newApplications()
 	if err != nil {
 		globalLogger.Fatal().Err(err).Msg("Failed creating applications")
+	}
+
+	if validateConfig {
+		globalLogger.Info().Msg("Configuration file is valid")
+		os.Exit(0)
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
