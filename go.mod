@@ -1,6 +1,8 @@
 module github.com/corazawaf/coraza-spoa
 
-go 1.22.9
+go 1.23.0
+
+toolchain go1.24.1
 
 require (
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20240226094324-415b1017abdc
@@ -24,9 +26,9 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/valllabh/ocsf-schema-golang v1.0.3 // indirect
-	golang.org/x/net v0.34.0 // indirect
+	golang.org/x/net v0.36.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
 	rsc.io/binaryregexp v0.2.0 // indirect
 )
