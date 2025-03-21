@@ -4,7 +4,7 @@ go 1.22.9
 
 require (
 	github.com/corazawaf/coraza-coreruleset v0.0.0-20240226094324-415b1017abdc
-	github.com/corazawaf/coraza/v3 v3.3.2
+	github.com/corazawaf/coraza/v3 v3.3.3
 	github.com/dropmorepackets/haproxy-go v0.0.5
 	github.com/fsnotify/fsnotify v1.8.0
 	github.com/jcchavezs/mergefs v0.1.0
