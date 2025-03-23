@@ -10,7 +10,7 @@ require (
 	github.com/jcchavezs/mergefs v0.1.0
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516
 	github.com/mccutchen/go-httpbin/v2 v2.18.0
-	github.com/rs/zerolog v1.33.0
+	github.com/rs/zerolog v1.34.0
 	gopkg.in/yaml.v3 v3.0.1
 	istio.io/istio v0.0.0-20240218163812-d80ef7b19049
 )
