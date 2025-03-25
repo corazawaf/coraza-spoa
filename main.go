@@ -67,7 +67,7 @@ func main() {
 
 	if validateConfig {
 		globalLogger.Info().Msg("Configuration file is valid")
-		os.Exit(0)
+		return
 	}
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
