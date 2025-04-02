@@ -7,23 +7,28 @@ import (
 	"context"
 	"flag"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
 	"runtime/pprof"
 	"syscall"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 
 	"github.com/corazawaf/coraza-spoa/internal"
 )
 
-var configPath string
-var validateConfig bool
-var autoReload bool
-var cpuProfile string
-var memProfile string
-var globalLogger = zerolog.New(os.Stderr).With().Timestamp().Logger()
+var (
+	configPath     string
+	validateConfig bool
+	autoReload     bool
+	cpuProfile     string
+	memProfile     string
+	promMetrics    bool
+	globalLogger   = zerolog.New(os.Stderr).With().Timestamp().Logger()
+)
 
 func main() {
 	flag.StringVar(&configPath, "config", "", "configuration file")
@@ -31,6 +36,7 @@ func main() {
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
+	flag.BoolVar(&promMetrics, "metrics", false, "collect and serve prometheus metrics on port 9100")
 	flag.Parse()
 
 	if configPath == "" {
@@ -83,6 +89,7 @@ func main() {
 		Context:      ctx,
 		Applications: apps,
 		Logger:       globalLogger,
+		Metrics:      promMetrics,
 	}
 	go func() {
 		defer cancelFunc()
@@ -92,6 +99,15 @@ func main() {
 			globalLogger.Fatal().Err(err).Msg("Listener closed")
 		}
 	}()
+
+	if promMetrics {
+		go func() {
+			http.Handle("/metrics", promhttp.Handler())
+			if err := http.ListenAndServe(":9100", nil); err != nil {
+				globalLogger.Error().Err(err).Msg("Metrics server failed")
+			}
+		}()
+	}
 
 	if autoReload {
 		go func() {
