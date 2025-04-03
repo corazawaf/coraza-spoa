@@ -26,7 +26,7 @@ var (
 	autoReload     bool
 	cpuProfile     string
 	memProfile     string
-	promMetrics    bool
+	metricsAddr    string
 	globalLogger   = zerolog.New(os.Stderr).With().Timestamp().Logger()
 )
 
@@ -36,7 +36,7 @@ func main() {
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
-	flag.BoolVar(&promMetrics, "metrics", false, "collect and serve prometheus metrics on port 9100")
+	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics")
 	flag.Parse()
 
 	if configPath == "" {
@@ -89,7 +89,6 @@ func main() {
 		Context:      ctx,
 		Applications: apps,
 		Logger:       globalLogger,
-		Metrics:      promMetrics,
 	}
 	go func() {
 		defer cancelFunc()
@@ -100,10 +99,10 @@ func main() {
 		}
 	}()
 
-	if promMetrics {
+	if metricsAddr != "" {
 		go func() {
 			http.Handle("/metrics", promhttp.Handler())
-			if err := http.ListenAndServe(":9100", nil); err != nil {
+			if err := http.ListenAndServe(metricsAddr, nil); err != nil {
 				globalLogger.Error().Err(err).Msg("Metrics server failed")
 			}
 		}()
