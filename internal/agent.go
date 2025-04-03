@@ -16,7 +16,6 @@ type Agent struct {
 	Context      context.Context
 	Applications map[string]*Application
 	Logger       zerolog.Logger
-	Metrics      bool
 
 	mtx sync.RWMutex
 }
@@ -37,10 +36,8 @@ func (a *Agent) ReplaceApplications(newApps map[string]*Application) {
 }
 
 func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) {
-	if a.Metrics {
-		timer := prometheus.NewTimer(handleSPOEDuration)
-		defer timer.ObserveDuration()
-	}
+	timer := prometheus.NewTimer(handleSPOEDuration)
+	defer timer.ObserveDuration()
 
 	const (
 		messageCorazaRequest  = "coraza-req"
