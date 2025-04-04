@@ -86,7 +86,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 			a.mtx.RUnlock()
 			if app == nil {
 				// If we cannot resolve the configured default app,
-				// we fail as this is an invalid configuration.
+				// we fail because this is an invalid configuration.
 				a.Logger.Panic().Str("app", appName).Str("default", a.DefaultApplication).Msg("both target app and default app not found")
 				return
 			}
