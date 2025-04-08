@@ -138,6 +138,7 @@ outer:
 				continue
 			}
 			cfg = newCfg
+			globalLogger.Info().Msg("Configuration successfully reloaded")
 		}
 	}
 
