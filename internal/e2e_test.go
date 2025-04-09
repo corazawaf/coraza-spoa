@@ -77,7 +77,7 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 
 	a := Agent{
 		Context:            context.Background(),
-		DefaultApplication: "default",
+		DefaultApplication: application,
 		Applications: map[string]*Application{
 			"default": application,
 		},

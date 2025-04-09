@@ -87,7 +87,7 @@ func main() {
 
 	a := &internal.Agent{
 		Context:            ctx,
-		DefaultApplication: cfg.DefaultApplication,
+		DefaultApplication: apps[cfg.DefaultApplication],
 		Applications:       apps,
 		Logger:             globalLogger,
 	}
