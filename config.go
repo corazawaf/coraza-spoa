@@ -34,6 +34,20 @@ func readConfig() (*config, error) {
 		globalLogger.Warn().Msg("no applications defined")
 	}
 
+	if cfg.DefaultApplication != "" {
+		var found bool
+		for _, app := range cfg.Applications {
+			if app.Name == cfg.DefaultApplication {
+				globalLogger.Debug().Str("app", cfg.DefaultApplication).Msg("configured as default application")
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("default application not found among defined applications: %s", cfg.DefaultApplication)
+		}
+	}
+
 	return &cfg, nil
 }
 

@@ -14,7 +14,7 @@ import (
 
 type Agent struct {
 	Context            context.Context
-	DefaultApplication string
+	DefaultApplication *Application
 	Applications       map[string]*Application
 	Logger             zerolog.Logger
 
@@ -74,24 +74,16 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	a.mtx.RLock()
 	app := a.Applications[appName]
 	a.mtx.RUnlock()
+	if app == nil && a.DefaultApplication != nil {
+		// If we cannot resolve the app but the default app is configured,
+		// we use the latter to process the request.
+		app = a.DefaultApplication
+		a.Logger.Debug().Str("app", appName).Msg("app not found, using default app")
+	}
 	if app == nil {
-		if a.DefaultApplication == "" {
-			// If we cannot resolve the target app and the default app is not set,
-			// we fail because it is impossible to satisfy the request.
-			a.Logger.Panic().Str("app", appName).Msg("target app not found")
-			return
-		} else {
-			a.mtx.RLock()
-			app = a.Applications[a.DefaultApplication]
-			a.mtx.RUnlock()
-			if app == nil {
-				// If we cannot resolve the configured default app,
-				// we fail because this is an invalid configuration.
-				a.Logger.Panic().Str("app", appName).Str("default", a.DefaultApplication).Msg("both target app and default app not found")
-				return
-			}
-			a.Logger.Debug().Str("app", appName).Str("default", a.DefaultApplication).Msg("target app not found, using default app instead")
-		}
+		// If we cannot resolve the app, we fail as this is an invalid configuration.
+		a.Logger.Panic().Str("app", appName).Msg("app not found")
+		return
 	}
 
 	err := messageHandler(app, ctx, writer, message)
