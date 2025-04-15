@@ -82,6 +82,7 @@ func (c *config) reloadConfig(a *internal.Agent) (*config, error) {
 	}
 
 	a.ReplaceApplications(apps)
+	globalLogger.Info().Msg("Configuration successfully reloaded")
 	return newCfg, nil
 }
 
@@ -124,7 +125,6 @@ func (c *config) watchConfig(a *internal.Agent) error {
 					continue
 				}
 				c = newCfg
-				globalLogger.Info().Msg("Configuration successfully reloaded")
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
