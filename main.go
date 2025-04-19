@@ -6,11 +6,13 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"syscall"
 
@@ -21,12 +23,17 @@ import (
 )
 
 var (
+	version = "dev"
+)
+
+var (
 	configPath     string
 	validateConfig bool
 	autoReload     bool
 	cpuProfile     string
 	memProfile     string
 	metricsAddr    string
+	showVersion    bool
 	globalLogger   = zerolog.New(os.Stderr).With().Timestamp().Logger()
 )
 
@@ -37,7 +44,16 @@ func main() {
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
 	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics")
+	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("version\t%s\n", version)
+		if bi, ok := debug.ReadBuildInfo(); ok {
+			fmt.Printf("%s", bi.String())
+		}
+		return
+	}
 
 	if configPath == "" {
 		globalLogger.Fatal().Msg("Configuration file is not set")
