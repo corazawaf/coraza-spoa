@@ -3,7 +3,7 @@ module github.com/corazawaf/coraza-spoa
 go 1.23.0
 
 require (
-	github.com/corazawaf/coraza-coreruleset v0.0.0-20240226094324-415b1017abdc
+	github.com/corazawaf/coraza-coreruleset/v4 v4.13.0
 	github.com/corazawaf/coraza/v3 v3.3.3
 	github.com/dropmorepackets/haproxy-go v0.0.5
 	github.com/fsnotify/fsnotify v1.9.0
@@ -20,7 +20,6 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/corazawaf/libinjection-go v0.2.2 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
