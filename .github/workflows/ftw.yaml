@@ -10,8 +10,14 @@ jobs:
   test:
     strategy:
       matrix:
-        haproxy-version: [3.0, 2.8]  # 3.1
-
+        haproxy-version:
+          - "3.1" # 2026-Q1 (stable)
+          - "3.0" # 2029-Q2 (LTS)
+          - "2.8" # 2028-Q2 (LTS)
+          - "2.6" # 2027-Q2 (LTS)
+          - "2.4" # 2026-Q2 (critical fixes only)
+          - "2.2" # 2025-Q2 (critical fixes only)
+      fail-fast: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,7 +35,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
-          name: ftw-haproxy-spoa-logs
+          name: "ftw-haproxy-${{ matrix.haproxy-version }}-logs"
           path: |
             build/ftw.log
             build/ftw-spoa.log
