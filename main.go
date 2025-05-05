@@ -6,18 +6,25 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"runtime"
+	"runtime/debug"
 	"runtime/pprof"
 	"syscall"
+	_ "unsafe"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 
 	"github.com/corazawaf/coraza-spoa/internal"
+)
+
+var (
+	Version = "dev"
 )
 
 var (
@@ -27,6 +34,7 @@ var (
 	cpuProfile     string
 	memProfile     string
 	metricsAddr    string
+	version        bool
 	globalLogger   = zerolog.New(os.Stderr).With().Timestamp().Logger()
 )
 
@@ -37,7 +45,16 @@ func main() {
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
 	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics")
+	flag.BoolVar(&version, "version", false, "show version and exit")
 	flag.Parse()
+
+	if version {
+		fmt.Printf("Coraza SPOA Version: %s\n", Version)
+		if bi, ok := debug.ReadBuildInfo(); ok {
+			fmt.Printf("Build Info: %s", bi.String())
+		}
+		return
+	}
 
 	if configPath == "" {
 		globalLogger.Fatal().Msg("Configuration file is not set")
