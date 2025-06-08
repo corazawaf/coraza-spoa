@@ -1,0 +1,15 @@
+{{ if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "coraza-spoa.fullname" . }}
+  labels:
+    {{- include "coraza-spoa.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "coraza-spoa.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - path: /metrics
+      port: metrics
+{{- end }}
