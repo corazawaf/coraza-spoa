@@ -61,8 +61,11 @@ func Build() error {
 	if arch == "" {
 		arch = runtime.GOARCH
 	}
-
-	if err := sh.RunWith(map[string]string{"GOARCH": arch}, "go", "build", "-o", "build/coraza-spoa"); err != nil {
+	gitVersion, _ := sh.Output("git", "describe", "--tags", "--always", "--dirty")
+	ldflags := fmt.Sprintf("-X 'main.version=%s'", gitVersion)
+	if err := sh.RunWith(map[string]string{
+		"GOARCH": arch,
+	}, "go", "build", "-ldflags="+ldflags, "-o", "build/coraza-spoa"); err != nil {
 		return err
 	}
 	return nil

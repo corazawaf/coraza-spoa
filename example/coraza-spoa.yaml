@@ -8,6 +8,10 @@ log_file: /dev/stdout
 # The log format, one of: console/json
 log_format: console
 
+# Optional default application to use when the app from the request
+# does not match any of the declared application names
+default_application: sample_app
+
 applications:
   # name is used as key to identify the directives
   - name: sample_app
@@ -17,6 +21,7 @@ applications:
       Include @coraza.conf-recommended
       Include @crs-setup.conf.example
       Include @owasp_crs/*.conf
+      SecRuleEngine On
 
     # HAProxy configured to send requests only, that means no cache required
     response_check: false
