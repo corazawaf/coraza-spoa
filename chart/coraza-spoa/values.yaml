@@ -1,0 +1,65 @@
+# Default values for coraza-spoa.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+image:
+  repository: ghcr.io/corazawaf/coraza-spoa@sha256
+  pullPolicy: IfNotPresent
+  tag: "b048f19913493b870e1ccc3f1eac62929208ad628a5faa3cf0e6e1dd0079a609"
+
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+resources: {}
+
+volumes: []
+volumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+metrics:
+  enabled: true
+  port: 9100
+  serviceMonitor:
+    enabled: true
+
+# -- Coraza SPOA configuration: https://github.com/corazawaf/coraza-spoa/blob/main/example/coraza-spoa.yaml
+config:
+  bind: 0.0.0.0:9000
+  log_file: /dev/stdout
+  log_format: json
+  log_level: info
+  default_application: default-app
+  applications:
+    - name: default-app
+      log_file: /dev/stdout
+      log_format: json
+      log_level: error
+      response_check: false
+      transaction_ttl_ms: 60000
+      directives: |
+        Include @coraza.conf-recommended
+        Include @crs-setup.conf.example
+        Include /etc/coraza/pre_rules.conf
+        Include @owasp_crs/*.conf
+        Include /etc/coraza/post_rules.conf
+
+# -- Custom rules that will be mounted as separate files.
+rules:
+  # -- These rules will be mounted at `/etc/coraza/pre_rules.conf`
+  pre: |-
+    # SecRule REQUEST_HEADERS:Host "@endsWith DOMAIN" "id:1,phase:1,pass,nolog,t:none,ctl:ruleRemoveById=ID"
+  # -- These rules will be mounted at `/etc/coraza/post_rules.conf`
+  post: |-
+    SecRuleEngine On
