@@ -13,10 +13,9 @@ import (
 	"time"
 
 	"github.com/corazawaf/coraza/v3/http/e2e"
+	"github.com/dropmorepackets/haproxy-go/pkg/testutil"
 	"github.com/mccutchen/go-httpbin/v2/httpbin"
 	"github.com/rs/zerolog"
-
-	"github.com/dropmorepackets/haproxy-go/pkg/testutil"
 )
 
 func TestE2E(t *testing.T) {
@@ -77,7 +76,8 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 	}
 
 	a := Agent{
-		Context: context.Background(),
+		Context:            context.Background(),
+		DefaultApplication: application,
 		Applications: map[string]*Application{
 			"default": application,
 		},

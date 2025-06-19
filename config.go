@@ -5,8 +5,10 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog"
 	"gopkg.in/yaml.v3"
 
@@ -32,13 +34,28 @@ func readConfig() (*config, error) {
 		globalLogger.Warn().Msg("no applications defined")
 	}
 
+	if cfg.DefaultApplication != "" {
+		var found bool
+		for _, app := range cfg.Applications {
+			if app.Name == cfg.DefaultApplication {
+				globalLogger.Debug().Str("app", cfg.DefaultApplication).Msg("configured as default application")
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("default application not found among defined applications: %s", cfg.DefaultApplication)
+		}
+	}
+
 	return &cfg, nil
 }
 
 type config struct {
-	Bind         string    `yaml:"bind"`
-	Log          logConfig `yaml:",inline"`
-	Applications []struct {
+	Bind               string    `yaml:"bind"`
+	Log                logConfig `yaml:",inline"`
+	DefaultApplication string    `yaml:"default_application"`
+	Applications       []struct {
 		Log              logConfig `yaml:",inline"`
 		Name             string    `yaml:"name"`
 		Directives       string    `yaml:"directives"`
@@ -54,6 +71,83 @@ func (c config) networkAddressFromBind() (network string, address string) {
 	}
 
 	return "tcp", c.Bind
+}
+
+func (c *config) reloadConfig(a *internal.Agent) (*config, error) {
+	newCfg, err := readConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error loading configuration: %w", err)
+	}
+
+	if c.Log != newCfg.Log {
+		newLogger, err := newCfg.Log.newLogger()
+		if err != nil {
+			return nil, fmt.Errorf("error creating new global logger: %w", err)
+		}
+		globalLogger = newLogger
+	}
+
+	if c.Bind != newCfg.Bind {
+		return nil, fmt.Errorf("changing bind is not supported yet")
+	}
+
+	apps, err := newCfg.newApplications()
+	if err != nil {
+		return nil, fmt.Errorf("error applying configuration: %w", err)
+	}
+
+	a.ReplaceApplications(apps)
+	globalLogger.Info().Msg("Configuration successfully reloaded")
+	return newCfg, nil
+}
+
+func (c *config) watchConfig(a *internal.Agent) error {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create fsnotify watcher: %w", err)
+	}
+	defer watcher.Close()
+
+	// configmap mounts are symlinks
+	// so we have to watch the parent directory instead of the file itself
+	configDir := filepath.Dir(configPath)
+	err = watcher.Add(configDir)
+	if err != nil {
+		return fmt.Errorf("failed to add config directory to fsnotify watcher: %w", err)
+	}
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return nil
+			}
+			// on configmap change, the directory symlink is recreated
+			// so we have to catch this event and readd the directory back to watcher
+			if event.Op == fsnotify.Remove {
+				globalLogger.Info().Msg("Config directory updated, reloading configuration...")
+				err = watcher.Remove(configDir)
+				if err != nil {
+					return fmt.Errorf("failed to remove config directory from fsnotify watcher: %w", err)
+				}
+				err = watcher.Add(configDir)
+				if err != nil {
+					return fmt.Errorf("failed to add config directory to fsnotify watcher: %w", err)
+				}
+				newCfg, err := c.reloadConfig(a)
+				if err != nil {
+					globalLogger.Error().Err(err).Msg("Failed to reload configuration, using old configuration")
+					continue
+				}
+				c = newCfg
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return nil
+			}
+			globalLogger.Error().Err(err).Msg("Error watching config directory")
+		}
+	}
 }
 
 func (c config) newApplications() (map[string]*internal.Application, error) {
