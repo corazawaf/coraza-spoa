@@ -1,0 +1,41 @@
+---
+
+name: FTW Test
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - haproxy-version: '2.8'
+            os: 'ubuntu-22.04'
+          - haproxy-version: '3.0'
+            os: 'ubuntu-24.04'
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Run regression tests (ftw)
+        run: go run mage.go ftw
+        env:
+          FTW_HAPROXY_VERSION: "${{ matrix.haproxy-version }}"
+
+      - uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: ftw-haproxy-spoa-logs
+          path: |
+            build/ftw.log
+            build/ftw-spoa.log
+            build/ftw-haproxy.log
