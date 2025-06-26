@@ -3,13 +3,13 @@ module github.com/corazawaf/coraza-spoa
 go 1.23.0
 
 require (
-	github.com/corazawaf/coraza-coreruleset/v4 v4.13.0
+	github.com/corazawaf/coraza-coreruleset/v4 v4.15.0
 	github.com/corazawaf/coraza/v3 v3.3.3
-	github.com/dropmorepackets/haproxy-go v0.0.5
+	github.com/dropmorepackets/haproxy-go v0.0.7
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/jcchavezs/mergefs v0.1.0
-	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516
-	github.com/mccutchen/go-httpbin/v2 v2.18.1
+	github.com/magefile/mage v1.15.1-0.20250615140142-78acbaf2e3ae
+	github.com/mccutchen/go-httpbin/v2 v2.18.3
 	github.com/prometheus/client_golang v1.22.0
 	github.com/rs/zerolog v1.34.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -31,7 +31,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/valllabh/ocsf-schema-golang v1.0.3 // indirect
-	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
