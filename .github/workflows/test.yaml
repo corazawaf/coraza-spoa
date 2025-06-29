@@ -1,3 +1,4 @@
+---
 name: Test
 
 on:
@@ -6,7 +7,16 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - haproxy-version: '2.8'
+            os: 'ubuntu-22.04'
+          - haproxy-version: '3.0'
+            os: 'ubuntu-24.04'
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
@@ -18,7 +28,7 @@ jobs:
       - name: setup environment
         run: |
           sudo apt-get install -y software-properties-common
-          sudo add-apt-repository -y ppa:vbernat/haproxy-2.8
+          sudo add-apt-repository -y ppa:vbernat/haproxy-${{ matrix.haproxy-version }}
           sudo apt-get update
           sudo apt-get install -y haproxy
           haproxy -vv
