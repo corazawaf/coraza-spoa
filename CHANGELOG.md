@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/corazawaf/coraza-spoa/compare/v0.2.0...v0.3.0) (2025-07-02)
+
+
+### Features
+
+* add SetServerName to transaction ([c5252cc](https://github.com/corazawaf/coraza-spoa/commit/c5252cc794600345c028de58f3047baedf732300))
+
 ## 0.2.0 (2025-06-26)
 
 
