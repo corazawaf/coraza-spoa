@@ -3,8 +3,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "*"
     paths:
       # build a semver tagged image after release-please pr merge
       - CHANGELOG.md
@@ -47,17 +45,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@ed68ef82c095e0d48ec87eccea555d944a631a4c # v46
+
+      - name: Get the tag from the new release
+        id: get-tag
+        if: contains(steps.changed-files.outputs.modified_files, 'CHANGELOG.md')
+        run: |
+          echo tag=$(grep --color=never --perl-regex --only-matching --max-count=1 '^## \[?\K[^\]\s]+' CHANGELOG.md) >> $GITHUB_OUTPUT
+
       - name: Docker metadata
         id: meta-main
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=snapshot,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=ref,event=branch
-            type=ref,event=pr
+            type=raw,value=snapshot,enable=${{ steps.get-tag.outputs.tag == '' }}
+            type=raw,value=${{ steps.get-tag.outputs.tag }},enable=${{ steps.get-tag.outputs.tag != '' }}
 
       - name: Image
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
