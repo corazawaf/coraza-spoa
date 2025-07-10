@@ -34,7 +34,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success() || failure()
         with:
-          name: ftw-haproxy-spoa-logs
+          name: "ftw-haproxy-spoa-logs-${{ matrix.haproxy-version }}"
           path: |
             build/ftw.log
             build/ftw-spoa.log
