@@ -160,3 +160,20 @@ func Precommit() error {
 func Check() {
 	mg.SerialDeps(Lint, Test)
 }
+
+// Ftw runs CRS regressions tests. Requires docker.
+func Ftw() error {
+	env := map[string]string{
+		"FTW_CLOUDMODE":       os.Getenv("FTW_CLOUDMODE"),
+		"FTW_INCLUDE":         os.Getenv("FTW_INCLUDE"),
+		"FTW_HAPROXY_VERSION": os.Getenv("FTW_HAPROXY_VERSION"),
+	}
+	if err := sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "build", "--pull", "--no-cache"); err != nil {
+		return err
+	}
+	defer func() {
+		_ = sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "down", "-v")
+	}()
+
+	return sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "run", "--rm", "ftw")
+}

@@ -1,0 +1,63 @@
+---
+
+services:
+  backend:
+    image: ghcr.io/coreruleset/albedo:0.0.16
+    command: ['--port', '8081']
+    ports:
+      - 8081:8081
+
+  # clean existing logs, enable haproxy to write logs, allow devs to manage logs without sudo
+  prepare-logs:
+    image: alpine:3.21
+    command:
+      - /bin/sh
+      - -c
+      - rm -f /build/ftw* && touch /build/ftw.log /build/ftw-haproxy.log /build/ftw-haproxy.log /build/ftw-audit.log && chmod 666 /build/ftw*
+    volumes:
+      - ../build:/build:rw
+
+  coraza-spoa:
+    depends_on:
+      - prepare-logs
+    build:
+      context: ..
+      dockerfile: ./ftw/Dockerfile.coraza_spoa
+      network: host
+    volumes:
+     - ../build:/build:rw
+    ports:
+      - 9000:9000
+
+  haproxy:
+    depends_on:
+      - prepare-logs
+      - backend
+    image: "haproxy:${FTW_HAPROXY_VERSION:-3.0}-alpine"
+    links:
+      - coraza-spoa:coraza-spoa
+    volumes:
+      - type: bind
+        source: ./haproxy/
+        target: /usr/local/etc/haproxy
+      - ../build:/build:rw
+    command:
+      - /bin/sh
+      - -c
+      - haproxy -f /usr/local/etc/haproxy/haproxy.cfg > /build/ftw-haproxy.log
+    ports:
+      - 8080:8080
+
+  ftw:
+    depends_on:
+      - coraza-spoa
+      - haproxy
+    build:
+      context: .
+      dockerfile: Dockerfile.ftw
+      network: host
+    environment:
+      - FTW_CLOUDMODE
+      - FTW_INCLUDE
+    volumes:
+      - ../build:/build
