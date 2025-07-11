@@ -2,14 +2,14 @@
 
 services:
   backend:
-    image: ghcr.io/coreruleset/albedo:0.0.16
+    image: ghcr.io/coreruleset/albedo:0.0.16@sha256:0961035bb0ecce95f9b485e1ab1cfc89b626925699576495cfa4287f6fd1cda4
     command: ['--port', '8081']
     ports:
       - 8081:8081
 
   # clean existing logs, enable haproxy to write logs, allow devs to manage logs without sudo
   prepare-logs:
-    image: alpine:3.21
+    image: alpine:3.21@sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c
     command:
       - /bin/sh
       - -c
