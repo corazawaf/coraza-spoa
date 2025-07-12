@@ -2,7 +2,7 @@
 
 services:
   backend:
-    image: ghcr.io/coreruleset/albedo:0.0.16@sha256:0961035bb0ecce95f9b485e1ab1cfc89b626925699576495cfa4287f6fd1cda4
+    image: ghcr.io/coreruleset/albedo:0.2.0@sha256:bc9b7e4f83a5268ccd2b4d1d26e926b6324e20ff1d91281c339ad82e55f5bab2
     command: ['--port', '8081']
     ports:
       - 8081:8081
