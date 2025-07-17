@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/corazawaf/coraza-spoa/compare/v0.3.0...v0.4.0) (2025-07-17)
+
+
+### Features
+
+* add support for ftw-tests ([dcabd18](https://github.com/corazawaf/coraza-spoa/commit/dcabd18b68987111d28e93df7af69a70e59990ef))
+
 ## [0.3.0](https://github.com/corazawaf/coraza-spoa/compare/v0.2.0...v0.3.0) (2025-07-02)
 
 
