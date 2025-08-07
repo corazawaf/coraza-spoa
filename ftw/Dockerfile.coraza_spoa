@@ -1,7 +1,7 @@
 # Copyright 2023 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.23@sha256:080fb3462a60d926829ddcf0626acf0533eeeee934fea6c160d85565281ddc0a AS build
+FROM golang:1.23@sha256:8b9a1e34c73ab8a774613c6b66cd92c750d1eeaa72c914b551026156ca5a8c52 AS build
 
 WORKDIR /go/src/app
 COPY . .
