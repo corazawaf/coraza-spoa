@@ -15,6 +15,8 @@ jobs:
             os: 'ubuntu-22.04'
           - haproxy-version: '3.0'
             os: 'ubuntu-24.04'
+          - haproxy-version: '3.2'
+            os: 'ubuntu-24.04'
 
     runs-on: ${{ matrix.os }}
     steps:
