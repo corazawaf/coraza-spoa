@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/corazawaf/coraza-spoa/compare/v0.3.0...v0.4.0) (2025-09-05)
+
+
+### Features
+
+* add support for ftw-tests ([dcabd18](https://github.com/corazawaf/coraza-spoa/commit/dcabd18b68987111d28e93df7af69a70e59990ef))
+* print matched error logs as json if requested ([f4684ed](https://github.com/corazawaf/coraza-spoa/commit/f4684ededd43455fe0592fad5cb34814e1130854))
+
+
+### Bug Fixes
+
+* **deps:** update all non-major dependencies in .github/workflows/container-image.yaml ([#261](https://github.com/corazawaf/coraza-spoa/issues/261)) ([9b4a2bb](https://github.com/corazawaf/coraza-spoa/commit/9b4a2bb3a7f99f9c5167ef79d6fcb1d7545e50b6))
+* **deps:** update all non-major dependencies in .github/workflows/test.yaml ([#268](https://github.com/corazawaf/coraza-spoa/issues/268)) ([1d83755](https://github.com/corazawaf/coraza-spoa/commit/1d83755b6b44c06ba9a68b9aa315043cf7d8a899))
+* **deps:** update module github.com/corazawaf/coraza-coreruleset/v4 to v4.16.0 in go.mod ([#259](https://github.com/corazawaf/coraza-spoa/issues/259)) ([2f9819c](https://github.com/corazawaf/coraza-spoa/commit/2f9819c769d9b52afcb3becc78bfed79ce148f39))
+* **deps:** update module github.com/prometheus/client_golang to v1.23.1 in go.mod ([3866c1b](https://github.com/corazawaf/coraza-spoa/commit/3866c1bcc1ca96e7013fc6d87b7ab395724cb0b0))
+
 ## [0.3.0](https://github.com/corazawaf/coraza-spoa/compare/v0.2.0...v0.3.0) (2025-07-02)
 
 
