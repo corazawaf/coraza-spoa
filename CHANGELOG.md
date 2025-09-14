@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/corazawaf/coraza-spoa/compare/v0.4.0...v0.4.1) (2025-09-14)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/prometheus/client_golang to v1.23.2 in go.mod ([#277](https://github.com/corazawaf/coraza-spoa/issues/277)) ([266cf75](https://github.com/corazawaf/coraza-spoa/commit/266cf755ef1a876748f2a8d48ddc632ec7a4f4ed))
+
 ## [0.4.0](https://github.com/corazawaf/coraza-spoa/compare/v0.3.0...v0.4.0) (2025-09-05)
 
 
