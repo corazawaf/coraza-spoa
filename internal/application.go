@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -438,6 +439,48 @@ func phaseToString(phase types.RulePhase) string {
 }
 
 func (a *Application) logCallback(mr types.MatchedRule) {
+	// Check that mr and rule are not nil
+	if mr == nil {
+		a.Logger.Warn().Msg("matched rule is nil in logCallback")
+		return
+	}
+	
+	rule := mr.Rule()
+	if rule == nil {
+		a.Logger.Warn().Msg("rule is nil in logCallback")
+		return
+	}
+	
+	// Record metrics for matched rules
+	
+	// Increment counter by severity if severity is valid
+	if severity := rule.Severity(); severity != 0 {
+		severityStr := severity.String()
+		if severityStr != "" {
+			handleResponsesBySeverity.WithLabelValues(severityStr).Inc()
+		} else {
+			a.Logger.Debug().Int("severity", severity.Int()).Msg("invalid severity in logCallback")
+		}
+	}
+	
+	// Increment counter by rule if ID is valid (> 0)
+	if ruleID := rule.ID(); ruleID > 0 {
+		ruleIDStr := strconv.Itoa(ruleID)
+		handleResponsesByRule.WithLabelValues(ruleIDStr).Inc()
+	} else {
+		a.Logger.Debug().Int("rule_id", ruleID).Msg("invalid rule ID in logCallback")
+	}
+	
+	// Update version metric if available and not empty
+	if version := rule.Version(); version != "" {
+		// Check that version contains only valid characters for Prometheus
+		if len(version) > 0 && len(version) < 256 {
+			handleVersion.WithLabelValues(version).Set(1)
+		} else {
+			a.Logger.Debug().Str("version", version).Msg("invalid version format in logCallback")
+		}
+	}
+
 	var l *zerolog.Event
 
 	switch mr.Rule().Severity() {
