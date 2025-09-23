@@ -13,8 +13,14 @@ services:
     build:
       context: ..
       dockerfile: ./example/Dockerfile
+    command:
+      - "/coraza-spoa"
+      - "--config"
+      - "/config.yaml"
+      - "--metrics-addr=:9100"
     ports:
       - "9000:9000"
+      - "9100:9100"
 
   haproxy:
     restart: unless-stopped
