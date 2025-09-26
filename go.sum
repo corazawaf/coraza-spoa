@@ -14,6 +14,8 @@ github.com/corazawaf/coraza-coreruleset/v4 v4.16.0 h1:xbC785u2JYTkoZpYDchW3NOys8
 github.com/corazawaf/coraza-coreruleset/v4 v4.16.0/go.mod h1:yeZPZUM23HVL0jMAzLfKF3M7XjCQBXDrvcQT/gkjwhg=
 github.com/corazawaf/coraza-coreruleset/v4 v4.17.1 h1:p/ukmri8hNJcZI5PA1OY54sw1eVndRH7gwwMWMhtEgw=
 github.com/corazawaf/coraza-coreruleset/v4 v4.17.1/go.mod h1:yeZPZUM23HVL0jMAzLfKF3M7XjCQBXDrvcQT/gkjwhg=
+github.com/corazawaf/coraza-coreruleset/v4 v4.18.0 h1:QKuhGP32hqe7DqSUgUYTof2xA+sfiDv5HCgVEp3ao6k=
+github.com/corazawaf/coraza-coreruleset/v4 v4.18.0/go.mod h1:tRjsdtj39+at47dLCpE8ChoDa2FK2IAwTWIpDT8Z62g=
 github.com/corazawaf/coraza/v3 v3.3.3 h1:kqjStHAgWqwP5dh7n0vhTOF0a3t+VikNS/EaMiG0Fhk=
 github.com/corazawaf/coraza/v3 v3.3.3/go.mod h1:xSaXWOhFMSbrV8qOOfBKAyw3aOqfwaSaOy5BgSF8XlA=
 github.com/corazawaf/libinjection-go v0.2.2 h1:Chzodvb6+NXh6wew5/yhD0Ggioif9ACrQGR4qjTCs1g=
@@ -38,6 +40,8 @@ github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc h1:GN2Lv3MGO7AS6PrR
 github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc/go.mod h1:+JKpmjMGhpgPL+rXZ5nsZieVzvarn86asRlBg4uNGnk=
 github.com/jcchavezs/mergefs v0.1.0 h1:7oteO7Ocl/fnfFMkoVLJxTveCjrsd//UB0j89xmnpec=
 github.com/jcchavezs/mergefs v0.1.0/go.mod h1:eRLTrsA+vFwQZ48hj8p8gki/5v9C2bFtHH5Mnn4bcGk=
+github.com/jcchavezs/mergefs v0.1.1 h1:D45R17m6dHnSVZefnhynoeZvcK2Uw0oTrRfoUOQ0S5Y=
+github.com/jcchavezs/mergefs v0.1.1/go.mod h1:eRLTrsA+vFwQZ48hj8p8gki/5v9C2bFtHH5Mnn4bcGk=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
 github.com/klauspost/compress v1.18.0/go.mod h1:2Pp+KzxcywXVXMr50+X0Q/Lsb43OQHYWRCY2AiWywWQ=
 github.com/kr/pretty v0.3.1 h1:flRD4NNwYAUpkphVc1HcthR4KEIFJ65n8Mw5qdRn3LE=
