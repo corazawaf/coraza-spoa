@@ -10,13 +10,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
+
+	// Import as sideeffect for version detection based on build info.
+	_ "github.com/corazawaf/coraza-coreruleset/v4"
 )
 
 var addLicenseVersion = "v1.1.1" // https://github.com/google/addlicense/releases
@@ -163,17 +168,44 @@ func Check() {
 
 // Ftw runs CRS regressions tests. Requires docker.
 func Ftw() error {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		log.Fatal("failed to read build info")
+	}
+	var crsVersion string
+	for _, dep := range info.Deps {
+		fmt.Printf("module: %s@%s", dep.Path, dep.Version)
+		if dep.Path == "github.com/corazawaf/coraza-coreruleset/v4" {
+			crsVersion = dep.Version
+			break
+		}
+	}
+	if crsVersion == "" {
+		return errors.New("CRS version could not be resolved")
+	}
+
 	env := map[string]string{
 		"FTW_CLOUDMODE":       os.Getenv("FTW_CLOUDMODE"),
 		"FTW_INCLUDE":         os.Getenv("FTW_INCLUDE"),
 		"FTW_HAPROXY_VERSION": os.Getenv("FTW_HAPROXY_VERSION"),
+		"CRS_VERSION":         os.Getenv("CRS_VERSION"),
 	}
-	if err := sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "build", "--pull", "--no-cache"); err != nil {
+
+	if err := sh.RunWithV(env,
+		"docker", "compose",
+		"--file", "ftw/docker-compose.yml",
+		"build", "--pull", "--no-cache",
+		"--build-arg", fmt.Sprintf("CRS_VERSION=%s", crsVersion),
+	); err != nil {
 		return err
 	}
 	defer func() {
 		_ = sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "down", "-v")
 	}()
 
-	return sh.RunWithV(env, "docker", "compose", "--file", "ftw/docker-compose.yml", "run", "--rm", "ftw")
+	return sh.RunWithV(env,
+		"docker", "compose",
+		"--file", "ftw/docker-compose.yml",
+		"run", "--rm", "ftw",
+	)
 }
