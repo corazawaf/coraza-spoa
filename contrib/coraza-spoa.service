@@ -6,6 +6,7 @@ Documentation=https://www.coraza.io
 ExecStart=/usr/bin/coraza-spoa -config=/etc/coraza-spoa/config.yaml
 WorkingDirectory=/
 Restart=always
+RestartSec=1
 Type=exec
 User=coraza-spoa
 Group=coraza-spoa
