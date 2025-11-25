@@ -14,7 +14,7 @@ HAProxy includes a [Stream Processing Offload Engine](https://www.haproxy.com/bl
 
 ### Build
 
-The command `go run mage.go build` will compile the source code and produce the executable file `coraza-spoa`.
+The command `go run mage.go build` will compile the source code and produce the executable file `coraza-spoa` inside the `build/` folder.
 
 ## Configuration
 
@@ -23,10 +23,8 @@ The command `go run mage.go build` will compile the source code and produce the 
 The example configuration file is [example/coraza-spoa.yaml](https://github.com/corazawaf/coraza-spoa/blob/main/example/coraza-spoa.yaml), you can copy it and modify the related configuration information. You can start the service by running the command:
 
 ```
-coraza-spoa -f /etc/coraza-spoa/coraza-spoa.yaml
+coraza-spoa -config /etc/coraza-spoa/coraza-spoa.yaml
 ```
-
-You will also want to download & extract the [OWASP Core Ruleset]( https://github.com/coreruleset/coreruleset/releases) (version 4+ supported) to the `/etc/coraza-spoa` directory.
 
 ## HAProxy SPOE
 
@@ -40,7 +38,6 @@ spoe-agent coraza-agent
 
 spoe-message coraza-req
     args app=str(sample_app) id=unique-id src-ip=src ...
-    event on-frontend-http-request
 ```
 
 The application name from `config.yaml` must match the `app=` name.
@@ -58,17 +55,18 @@ Configure HAProxy with a frontend, which contains a `filter` statement to forwar
 frontend web
     filter spoe engine coraza config /etc/haproxy/coraza.cfg
     ...
-    http-request deny deny_status 403 hdr waf-block "request"  if { var(txn.coraza.action) -m str deny }
+    http-request deny deny_status 403 hdr waf-block "request" if { var(txn.coraza.action) -m str deny }
     ...
 
 backend coraza-spoa
     mode tcp
-    server s1 127.0.0.1:9000
+    option spop-check
+    server s1 127.0.0.1:9000 check
 ```
 
 A comprehensive HAProxy configuration example can be found in [example/haproxy/coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg).
 
-Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L14) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L37):
+Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L13) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L50):
 
 If you intend to access coraza-spoa service from another machine, remember to change the binding networking directives (IPAddressAllow/IPAddressDeny) in [contrib/coraza-spoa.service](https://github.com/corazawaf/coraza-spoa/blob/main/contrib/coraza-spoa.service)
 
