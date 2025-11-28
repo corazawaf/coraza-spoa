@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/corazawaf/coraza-spoa/compare/v0.4.0...v0.5.0) (2025-11-28)
+
+
+### Features
+
+* replace duplicate crs version pinning ([6808ae0](https://github.com/corazawaf/coraza-spoa/commit/6808ae0a8554b271a11da1122f30af581d602cb0))
+
+
+### Bug Fixes
+
+* **deps:** update all non-major dependencies in .github/workflows/container-image.yaml ([8720b12](https://github.com/corazawaf/coraza-spoa/commit/8720b123e9691fe4efacfe1867b119c2ff7a8b74))
+* **deps:** update module github.com/prometheus/client_golang to v1.23.2 in go.mod ([#277](https://github.com/corazawaf/coraza-spoa/issues/277)) ([266cf75](https://github.com/corazawaf/coraza-spoa/commit/266cf755ef1a876748f2a8d48ddc632ec7a4f4ed))
+
 ## [0.4.0](https://github.com/corazawaf/coraza-spoa/compare/v0.3.0...v0.4.0) (2025-09-05)
 
 
