@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/corazawaf/coraza-spoa/compare/v0.5.0...v0.5.1) (2025-12-20)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/corazawaf/coraza-coreruleset/v4 to v4.21.0 in go.mod ([#299](https://github.com/corazawaf/coraza-spoa/issues/299)) ([8649493](https://github.com/corazawaf/coraza-spoa/commit/8649493302807a4a7b92894a9873391127907f45))
+
 ## [0.5.0](https://github.com/corazawaf/coraza-spoa/compare/v0.4.0...v0.5.0) (2025-11-28)
 
 
