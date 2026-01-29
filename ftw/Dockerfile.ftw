@@ -1,7 +1,7 @@
 # Copyright 2025 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
 
-FROM ghcr.io/coreruleset/go-ftw:1.3.0@sha256:99e5d772dc0292a1685b23cff2ba40463db71ab96ebf98aa9cf517b641300254
+FROM ghcr.io/coreruleset/go-ftw:2.0.0@sha256:58c05255ac23da4f7953d990313945f46dbd7da9d99b4304ee9bf7a3dc6131c2
 
 RUN apk update && apk add curl
 
