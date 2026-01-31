@@ -5,7 +5,7 @@ go 1.23.0
 require (
 	github.com/corazawaf/coraza-coreruleset/v4 v4.21.0
 	github.com/corazawaf/coraza/v3 v3.3.3
-	github.com/dropmorepackets/haproxy-go v0.0.7
+	github.com/dropmorepackets/haproxy-go v0.0.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/jcchavezs/mergefs v0.1.1
 	github.com/magefile/mage v1.15.1-0.20250615140142-78acbaf2e3ae
