@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/corazawaf/coraza-spoa/compare/v0.5.0...v0.5.1) (2026-02-02)
+
+
+### Bug Fixes
+
+* **deps:** update all non-major dependencies in .github/workflows/test.yaml ([#303](https://github.com/corazawaf/coraza-spoa/issues/303)) ([739228a](https://github.com/corazawaf/coraza-spoa/commit/739228a20df80d05650c4a3f78b4d7f74d0e497d))
+* **deps:** update module github.com/corazawaf/coraza-coreruleset/v4 to v4.21.0 in go.mod ([#299](https://github.com/corazawaf/coraza-spoa/issues/299)) ([8649493](https://github.com/corazawaf/coraza-spoa/commit/8649493302807a4a7b92894a9873391127907f45))
+* **deps:** update module github.com/corazawaf/coraza-coreruleset/v4 to v4.22.0 in go.mod ([e19401e](https://github.com/corazawaf/coraza-spoa/commit/e19401e3465a075eb518a1a4ea4e1b57fd61eb02))
+
 ## [0.5.0](https://github.com/corazawaf/coraza-spoa/compare/v0.4.0...v0.5.0) (2025-11-28)
 
 
