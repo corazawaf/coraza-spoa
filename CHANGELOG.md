@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/corazawaf/coraza-spoa/compare/v0.5.1...v0.5.2) (2026-02-04)
+
+
+### Bug Fixes
+
+* change extend config from local to GitHub ([#311](https://github.com/corazawaf/coraza-spoa/issues/311)) ([8404373](https://github.com/corazawaf/coraza-spoa/commit/8404373ebe655cd5c1d364d3127cddc3e7feac1f))
+
 ## [0.5.1](https://github.com/corazawaf/coraza-spoa/compare/v0.5.0...v0.5.1) (2026-02-02)
 
 
