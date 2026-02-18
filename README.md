@@ -169,3 +169,7 @@ To avoid conflicts with the OWASP Core Rule Set (CRS) and to ensure that the SPO
 - Build the coraza-spoa image `cd ./example ; docker compose build`
 - Run haproxy, coraza-spoa and a mock server `docker compose up`
 - Perform a request which gets blocked by the WAF: `curl http://localhost:8080/\?x\=/etc/passwd`
+
+## Kubernetes
+
+For deploying Coraza SPOA on Kubernetes, you can use the official Helm chart available at [corazawaf/charts](https://github.com/corazawaf/charts/tree/main/charts/coraza-spoa).
