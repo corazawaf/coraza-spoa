@@ -97,7 +97,7 @@ backend coraza-spoa
 
 A comprehensive HAProxy configuration example can be found in [example/haproxy/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg).
 
-Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L13) to communicate with the service, we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L54).
+In the SPOE configuration file (coraza.cfg), we declare the [coraza-spoa backend](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L13) to communicate with the service, so we also need to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L54).
 
 The `http-request set-var(txn.coraza.app)` directive sets the application name that will be used by the SPOA to determine which Coraza configuration to apply. This should match one of the application names defined in your `coraza-spoa.yaml` configuration file. You can customize this per virtual host or use HAProxy variables such as `fe_name` (frontend name) instead of a hardcoded string.
 
