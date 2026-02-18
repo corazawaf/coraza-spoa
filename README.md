@@ -23,8 +23,10 @@ The command `go run mage.go build` will compile the source code and produce the 
 The example configuration file is [example/coraza-spoa.yaml](https://github.com/corazawaf/coraza-spoa/blob/main/example/coraza-spoa.yaml), you can copy it and modify the related configuration information. You can start the service by running the command:
 
 ```
-coraza-spoa -config /etc/coraza-spoa/coraza-spoa.yaml
+coraza-spoa -config /etc/coraza-spoa/config.yaml
 ```
+
+Note: The example file is named `coraza-spoa.yaml`, but it's recommended to rename it to `config.yaml` when deploying, especially if using the systemd service file from `contrib/coraza-spoa.service`.
 
 ## HAProxy SPOE
 
@@ -99,7 +101,16 @@ Because, in the SPOE configuration file (coraza.cfg), we declare to use the back
 
 The `http-request set-var(txn.coraza.app)` directive sets the application name that will be used by the SPOA to determine which Coraza configuration to apply. This should match one of the application names defined in your `coraza-spoa.yaml` configuration file. You can customize this per virtual host or use HAProxy variables such as `fe_name` (frontend name) instead of a hardcoded string.
 
-If you intend to access coraza-spoa service from another machine, remember to change the binding networking directives (IPAddressAllow/IPAddressDeny) in [contrib/coraza-spoa.service](https://github.com/corazawaf/coraza-spoa/blob/main/contrib/coraza-spoa.service)
+## Systemd Service
+
+If you intend to access the coraza-spoa service from another machine (non-localhost), you need to modify the network binding directives in [contrib/coraza-spoa.service](https://github.com/corazawaf/coraza-spoa/blob/main/contrib/coraza-spoa.service). By default, the service restricts access to localhost only:
+
+```ini
+IPAddressDeny=any
+IPAddressAllow=localhost
+```
+
+To allow access from other machines, update the `IPAddressAllow` directive to include the appropriate IP addresses or network ranges (e.g., `IPAddressAllow=localhost 192.168.1.0/24`).
 
 ## Docker
 
