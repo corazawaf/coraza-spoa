@@ -186,20 +186,23 @@ type logConfig struct {
 
 func (lc logConfig) outputWriter() (io.Writer, error) {
 	var out io.Writer
-	if lc.File == "" || lc.File == "/dev/stdout" {
-		out = os.Stdout
-	} else if lc.File == "/dev/stderr" {
-		out = os.Stderr
-	} else if lc.File == "/dev/null" {
-		out = io.Discard
-	} else {
-		// TODO: Close the handle if not used anymore.
-		// Currently these are leaked as soon as we reload.
-		f, err := os.OpenFile(lc.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-		if err != nil {
-			return nil, err
-		}
-		out = f
+	switch lc.File {
+		case "":
+			fallthrough
+		case "/dev/stdout":
+			out = os.Stdout
+		case "/dev/stderr":
+			out = os.Stderr
+		case "/dev/null":
+			out = io.Discard
+		default:
+			// TODO: Close the handle if not used anymore.
+			// Currently these are leaked as soon as we reload.
+			f, err := os.OpenFile(lc.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+			if err != nil {
+				return nil, err
+			}
+			out = f
 	}
 	return out, nil
 }
