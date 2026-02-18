@@ -32,41 +32,72 @@ Configure HAProxy to exchange messages with the SPOA. The example SPOE configura
 
 ```ini
 # /etc/haproxy/coraza.cfg
+[coraza]
 spoe-agent coraza-agent
-    ...
+    groups      coraza-req
+    option      var-prefix      coraza
+    option      set-on-error    error
+    timeout     hello           2s
+    timeout     idle            2m
+    timeout     processing      500ms
     use-backend coraza-spoa
+    log         global
 
 spoe-message coraza-req
-    args app=str(sample_app) id=unique-id src-ip=src ...
+    # Arguments are required to be in this order
+    args app=var(txn.coraza.app) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
+
+spoe-group coraza-req
+    messages coraza-req
 ```
 
-The application name from `config.yaml` must match the `app=` name.
+The application name from `config.yaml` must match the `app` variable set in the HAProxy configuration. Note that the `app` argument uses `var(txn.coraza.app)` which is set in the HAProxy frontend configuration (see below).
 
 The backend defined in `use-backend` must match a `haproxy.cfg` backend which directs requests to the SPOA daemon reachable via `127.0.0.1:9000`.
 
-Instead of the hard coded application name `str(sample_app)` you can use some HAProxy variables. For example, frontend name `fe_name`.
-
 ## HAProxy
 
-Configure HAProxy with a frontend, which contains a `filter` statement to forward requests to the SPOA and deny based on the returned action. Also add a backend section, which is referenced by use-backend in `coraza.cfg`.
+Configure HAProxy with a frontend, which sets the coraza app variable, configures the SPOE filter, sends requests to the SPOE for processing, and handles the returned actions. Also add a backend section, which is referenced by use-backend in `coraza.cfg`.
 
 ```haproxy
 # /etc/haproxy/haproxy.cfg
 frontend web
+    # Set coraza app variable - must match application name in coraza-spoa.yaml
+    http-request set-var(txn.coraza.app) str(sample_app)
+
+    # Configure SPOE filter and send requests for processing
     filter spoe engine coraza config /etc/haproxy/coraza.cfg
-    ...
-    http-request deny deny_status 403 hdr waf-block "request" if { var(txn.coraza.action) -m str deny }
+    http-request send-spoe-group coraza coraza-req
+
+    # Handle redirect action
+    http-request redirect code 302 location %[var(txn.coraza.data)] if { var(txn.coraza.action) -m str redirect }
+    http-response redirect code 302 location %[var(txn.coraza.data)] if { var(txn.coraza.action) -m str redirect }
+
+    # Handle deny action
+    http-request deny deny_status 403 hdr waf-block "request"  if { var(txn.coraza.action) -m str deny }
+    http-response deny deny_status 403 hdr waf-block "response" if { var(txn.coraza.action) -m str deny }
+
+    # Handle drop action
+    http-request silent-drop if { var(txn.coraza.action) -m str drop }
+    http-response silent-drop if { var(txn.coraza.action) -m str drop }
+
+    # Handle SPOA processing errors
+    http-request deny deny_status 500 if { var(txn.coraza.error) -m int gt 0 }
+    http-response deny deny_status 500 if { var(txn.coraza.error) -m int gt 0 }
+
     ...
 
 backend coraza-spoa
-    mode tcp
     option spop-check
+    mode tcp
     server s1 127.0.0.1:9000 check
 ```
 
-A comprehensive HAProxy configuration example can be found in [example/haproxy/coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg).
+A comprehensive HAProxy configuration example can be found in [example/haproxy/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg).
 
-Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L13) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L50):
+Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L13) to communicate with the service, we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L54).
+
+The `http-request set-var(txn.coraza.app)` directive sets the application name that will be used by the SPOA to determine which Coraza configuration to apply. This should match one of the application names defined in your `coraza-spoa.yaml` configuration file. You can customize this per virtual host or use HAProxy variables such as `fe_name` (frontend name) instead of a hardcoded string.
 
 If you intend to access coraza-spoa service from another machine, remember to change the binding networking directives (IPAddressAllow/IPAddressDeny) in [contrib/coraza-spoa.service](https://github.com/corazawaf/coraza-spoa/blob/main/contrib/coraza-spoa.service)
 
