@@ -154,6 +154,10 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		}
 	}()
 
+	defer func() {
+		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
+	}()
+
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
 	}
@@ -302,6 +306,10 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		if err := tx.Close(); err != nil {
 			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
 		}
+	}()
+
+	defer func() {
+		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
 	}()
 
 	if tx.IsRuleEngineOff() {
@@ -473,4 +481,14 @@ func (e ErrInterrupted) Is(target error) bool {
 		return false
 	}
 	return e.Interruption == t.Interruption
+}
+
+func countRulesHit(rules []types.MatchedRule) int64 {
+	var count int64
+	for _, mr := range rules {
+		if mr.Message() != "" {
+			count++
+		}
+	}
+	return count
 }
