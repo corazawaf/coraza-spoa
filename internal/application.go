@@ -155,8 +155,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 	}()
 
 	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit",
-			countRulesHit(tx.MatchedRules()))
+		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
 	}()
 
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
@@ -310,8 +309,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}()
 
 	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit",
-			countRulesHit(tx.MatchedRules()))
+		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
 	}()
 
 	if tx.IsRuleEngineOff() {
