@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/corazawaf/coraza-spoa/compare/v0.5.1...v0.6.0) (2026-02-20)
+
+
+### Features
+
+* add txn.coraza.rules_hit variable for detection-only rule match counting ([#314](https://github.com/corazawaf/coraza-spoa/issues/314)) ([ebe2937](https://github.com/corazawaf/coraza-spoa/commit/ebe29371effdd75044a79c7450831b3dfd11bd46))
+
+
+### Bug Fixes
+
+* change extend config from local to GitHub ([#311](https://github.com/corazawaf/coraza-spoa/issues/311)) ([8404373](https://github.com/corazawaf/coraza-spoa/commit/8404373ebe655cd5c1d364d3127cddc3e7feac1f))
+
 ## [0.5.1](https://github.com/corazawaf/coraza-spoa/compare/v0.5.0...v0.5.1) (2026-02-02)
 
 
