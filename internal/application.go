@@ -154,9 +154,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		}
 	}()
 
-	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
-	}()
+	defer exportWAFMetrics(writer, tx)
 
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
@@ -308,9 +306,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		}
 	}()
 
-	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
-	}()
+	defer exportWAFMetrics(writer, tx)
 
 	if tx.IsRuleEngineOff() {
 		goto exit
@@ -483,12 +479,97 @@ func (e ErrInterrupted) Is(target error) bool {
 	return e.Interruption == t.Interruption
 }
 
-func countRulesHit(rules []types.MatchedRule) int64 {
+// countMatchedRules returns the number of attack rules that matched the transaction.
+func countMatchedRules(rules []types.MatchedRule) int64 {
 	var count int64
 	for _, mr := range rules {
-		if mr.Message() != "" {
-			count++
+		// Ignore rules without a message (silent control flow rules)
+		if mr.Message() == "" {
+			continue
 		}
+		if !isAttackRule(mr.Rule().ID()) {
+			continue
+		}
+		count++
 	}
 	return count
+}
+
+const (
+	// DefaultCRSv4CriticalScore is the score for Critical, Alert, and Emergency severities
+	DefaultCRSv4CriticalScore = 5
+	// DefaultCRSv4ErrorScore is the score for Error severity
+	DefaultCRSv4ErrorScore = 4
+	// DefaultCRSv4WarningScore is the score for Warning severity
+	DefaultCRSv4WarningScore = 3
+	// DefaultCRSv4NoticeScore is the score for Notice severity
+	DefaultCRSv4NoticeScore = 2
+)
+
+// getAnomalyScore calculates the anomaly score based on CRS attack ranges.
+// Optimized to accept []types.MatchedRule to avoid repeated allocations/calls.
+func getAnomalyScore(rules []types.MatchedRule) int64 {
+	var score int64
+
+	for _, mr := range rules { // iterate directly over 'rules'
+		// Ignore rules without a message (silent control flow rules)
+		if mr.Message() == "" {
+			continue
+		}
+		if !isAttackRule(mr.Rule().ID()) {
+			continue
+		}
+
+		// Calculate the score based on standard CRS v4 severity constants
+		switch mr.Rule().Severity() {
+		case types.RuleSeverityEmergency, types.RuleSeverityAlert, types.RuleSeverityCritical:
+			score += DefaultCRSv4CriticalScore
+		case types.RuleSeverityError:
+			score += DefaultCRSv4ErrorScore
+		case types.RuleSeverityWarning:
+			score += DefaultCRSv4WarningScore
+		case types.RuleSeverityNotice:
+			score += DefaultCRSv4NoticeScore
+		}
+	}
+
+	return score
+}
+
+const (
+	// CRS Attack Rule Ranges
+	MinInboundAttackID  = 910000
+	MaxInboundAttackID  = 948999
+	MinOutboundAttackID = 950000
+	MaxOutboundAttackID = 958999
+
+	// Administrative and App-Specific Ranges (as per go-ftw)
+	MinAdminRuleID   = 900000
+	MaxAdminRuleID   = 900999
+	MinAppSpecificID = 903000
+	MaxAppSpecificID = 906999
+)
+
+// isAttackRule checks if the rule ID belongs to the actual CRS attack
+// or administrative ranges, following the go-ftw engine implementation.
+// isAttackRule checks if the rule ID belongs to the actual CRS attack ranges.
+// Setup rules (900xxx) and App-specific exclusions (903xxx) are ignored.
+func isAttackRule(ruleID int) bool {
+	// Standard Attack Ranges
+	isInboundAttack := ruleID >= MinInboundAttackID && ruleID <= MaxInboundAttackID
+	isOutboundAttack := ruleID >= MinOutboundAttackID && ruleID <= MaxOutboundAttackID
+
+	return isInboundAttack || isOutboundAttack
+}
+
+// exportWAFMetrics extracts the matched rules and sends the telemetry data to HAProxy.
+func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
+	// Performance optimization: Call tx.MatchedRules() only once
+	matchedRules := tx.MatchedRules()
+
+	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit",
+		countMatchedRules(matchedRules))
+
+	_ = writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score",
+		getAnomalyScore(matchedRules))
 }

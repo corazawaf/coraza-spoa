@@ -55,6 +55,53 @@ func TestE2E(t *testing.T) {
 
 		wg.Wait()
 	})
+
+	t.Run("waf metrics export", func(t *testing.T) {
+		config, _, _ := runCoraza(t)
+
+		t.Run("Clean request", func(t *testing.T) {
+			// Send a legitimate request that should pass without triggering attack rules
+			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/", http.NoBody)
+			req.Header.Set("coraza-e2e", "ok")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+
+			if score := resp.Header.Get("X-Anomaly-Score"); score != "0" && score != "" {
+				t.Errorf("expected anomaly score 0 or empty for normal request, got '%s'", score)
+			}
+
+			if matched := resp.Header.Get("X-Rules-Hit"); matched != "0" && matched != "" {
+				t.Errorf("expected matched rules 0 or empty for normal request, got '%s'", matched)
+			}
+		})
+
+		t.Run("Malicious request", func(t *testing.T) {
+			// Using our injected rule that falls within the official CRS attack range
+			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/?e2e_attack=1", http.NoBody)
+			req.Header.Set("coraza-e2e", "ok")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+
+			if resp.StatusCode != http.StatusForbidden {
+				t.Errorf("expected 403 Forbidden, got %d", resp.StatusCode)
+			}
+
+			score := resp.Header.Get("X-Anomaly-Score")
+			if score == "0" || score == "" {
+				t.Errorf("expected anomaly score > 0 for attack, got '%s'", score)
+			}
+
+			matched := resp.Header.Get("X-Rules-Hit")
+			if matched == "0" || matched == "" {
+				t.Errorf("expected matched rules > 0 for attack, got '%s'", matched)
+			}
+		})
+	})
+
 }
 
 func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
@@ -64,7 +111,9 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	appCfg := AppConfig{
-		Directives:     e2e.Directives,
+		Directives: e2e.Directives + `
+SecRule ARGS:e2e_attack "@streq 1" "id:920000,phase:1,deny,status:403,msg:'E2E Attack',log,severity:'CRITICAL'"
+`,
 		ResponseCheck:  true,
 		Logger:         logger,
 		TransactionTTL: 10 * time.Second,
@@ -104,8 +153,9 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
     http-request deny deny_status 424 hdr waf-block "request"  if is_deny status_424
     http-response deny deny_status 424 hdr waf-block "response" if is_deny status_424
 
-    http-request deny deny_status 403 hdr waf-block "request"  if is_deny
-    http-response deny deny_status 403 hdr waf-block "response" if is_deny
+    # INLINE HEADERS: Required because HAProxy skips http-response rules on local 403 denies
+    http-request deny deny_status 403 hdr waf-block "request" hdr X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]" hdr X-Rules-Hit "%[var(txn.e2e.rules_hit)]" if is_deny
+    http-response deny deny_status 403 hdr waf-block "response" hdr X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]" hdr X-Rules-Hit "%[var(txn.e2e.rules_hit)]" if is_deny
 
     http-request silent-drop if { var(txn.e2e.action) -m str drop }
     http-response silent-drop if { var(txn.e2e.action) -m str drop }
@@ -113,6 +163,10 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
     # Deny in case of an error, when processing with the Coraza SPOA
     http-request deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
     http-response deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
+
+    # For allowed requests, we append the headers to the successful response
+    http-response set-header X-Anomaly-Score %[var(txn.e2e.anomaly_score)]
+    http-response set-header X-Rules-Hit %[var(txn.e2e.rules_hit)]
 `,
 		EngineConfig: `
 [e2e]
