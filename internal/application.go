@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 	"github.com/jcchavezs/mergefs"
@@ -495,45 +497,21 @@ func countMatchedRules(rules []types.MatchedRule) int64 {
 	return count
 }
 
-const (
-	// DefaultCRSv4CriticalScore is the score for Critical, Alert, and Emergency severities
-	DefaultCRSv4CriticalScore = 5
-	// DefaultCRSv4ErrorScore is the score for Error severity
-	DefaultCRSv4ErrorScore = 4
-	// DefaultCRSv4WarningScore is the score for Warning severity
-	DefaultCRSv4WarningScore = 3
-	// DefaultCRSv4NoticeScore is the score for Notice severity
-	DefaultCRSv4NoticeScore = 2
-)
-
-// getAnomalyScore calculates the anomaly score based on CRS attack ranges.
-// Optimized to accept []types.MatchedRule to avoid repeated allocations/calls.
-func getAnomalyScore(rules []types.MatchedRule) int64 {
-	var score int64
-
-	for _, mr := range rules { // iterate directly over 'rules'
+// getTriggeredRuleIDs returns a comma-separated string of the matched attack rule IDs.
+func getTriggeredRuleIDs(rules []types.MatchedRule) string {
+	var ids []string
+	for _, mr := range rules {
 		// Ignore rules without a message (silent control flow rules)
 		if mr.Message() == "" {
 			continue
 		}
+		// Only include actual attack rules within the CRS range
 		if !isAttackRule(mr.Rule().ID()) {
 			continue
 		}
-
-		// Calculate the score based on standard CRS v4 severity constants
-		switch mr.Rule().Severity() {
-		case types.RuleSeverityEmergency, types.RuleSeverityAlert, types.RuleSeverityCritical:
-			score += DefaultCRSv4CriticalScore
-		case types.RuleSeverityError:
-			score += DefaultCRSv4ErrorScore
-		case types.RuleSeverityWarning:
-			score += DefaultCRSv4WarningScore
-		case types.RuleSeverityNotice:
-			score += DefaultCRSv4NoticeScore
-		}
+		ids = append(ids, strconv.Itoa(mr.Rule().ID()))
 	}
-
-	return score
+	return strings.Join(ids, ",")
 }
 
 const (
@@ -562,14 +540,25 @@ func isAttackRule(ruleID int) bool {
 	return isInboundAttack || isOutboundAttack
 }
 
-// exportWAFMetrics extracts the matched rules and sends the telemetry data to HAProxy.
 func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
 	// Performance optimization: Call tx.MatchedRules() only once
 	matchedRules := tx.MatchedRules()
 
-	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit",
-		countMatchedRules(matchedRules))
+	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countMatchedRules(matchedRules))
 
-	_ = writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score",
-		getAnomalyScore(matchedRules))
+	if txState, ok := tx.(plugintypes.TransactionState); ok {
+		// 1. Read CRS anomaly score directly
+		scores := txState.Variables().TX().Get("blocking_inbound_anomaly_score")
+		if len(scores) > 0 {
+			if v, err := strconv.ParseInt(scores[0], 10, 64); err == nil {
+				_ = writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", v)
+			}
+		}
+
+		// 2. Check if the user enabled rule_ids export via coraza.cfg
+		exportRuleIDs := txState.Variables().TX().Get("spoa_export_rule_ids")
+		if len(exportRuleIDs) > 0 && exportRuleIDs[0] == "1" {
+			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", getTriggeredRuleIDs(matchedRules))
+		}
+	}
 }
