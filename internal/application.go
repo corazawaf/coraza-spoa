@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 	"github.com/jcchavezs/mergefs"
@@ -22,6 +24,7 @@ import (
 	"istio.io/istio/pkg/cache"
 )
 
+// AppConfig contains the configuration settings for the WAF application.
 type AppConfig struct {
 	Directives     string
 	ResponseCheck  bool
@@ -30,6 +33,7 @@ type AppConfig struct {
 	LogFormat      string
 }
 
+// Application represents the main WAF application wrapping the Coraza WAF engine and cache.
 type Application struct {
 	waf   coraza.WAF
 	cache cache.ExpiringCache
@@ -37,11 +41,13 @@ type Application struct {
 	AppConfig
 }
 
+// transaction struct holds a Coraza WAF transaction and a mutex for thread-safe access.
 type transaction struct {
 	tx types.Transaction
 	m  sync.Mutex
 }
 
+// applicationRequest represents the parsed HTTP request parameters coming from HAProxy.
 type applicationRequest struct {
 	SrcIp   netip.Addr
 	SrcPort int64
@@ -56,6 +62,7 @@ type applicationRequest struct {
 	Body    []byte
 }
 
+// HandleRequest processes an incoming request from HAProxy, extracts variables, and evaluates it using the Coraza WAF.
 func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	k := encoding.AcquireKVEntry()
 	// run defer via anonymous function to not directly evaluate the arguments.
@@ -154,9 +161,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		}
 	}()
 
-	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
-	}()
+	defer exportWAFMetrics(writer, tx)
 
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
@@ -205,6 +210,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 	return nil
 }
 
+// readHeaders parses raw HTTP headers from HAProxy and feeds them into the WAF transaction via callbacks.
 func readHeaders(headers []byte, hdrCallback func(key string, value string), hostCallback func(value string)) error {
 	s := bufio.NewScanner(bytes.NewReader(headers))
 	for s.Scan() {
@@ -230,6 +236,7 @@ func readHeaders(headers []byte, hdrCallback func(key string, value string), hos
 	return nil
 }
 
+// applicationResponse represents the parsed HTTP response parameters coming from HAProxy.
 type applicationResponse struct {
 	ID      string
 	Version string
@@ -238,6 +245,7 @@ type applicationResponse struct {
 	Body    []byte
 }
 
+// HandleResponse evaluates an outgoing HTTP response from the backend server against WAF rules.
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	if !a.ResponseCheck {
 		return fmt.Errorf("got response but response check is disabled")
@@ -308,9 +316,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		}
 	}()
 
-	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
-	}()
+	defer exportWAFMetrics(writer, tx)
 
 	if tx.IsRuleEngineOff() {
 		goto exit
@@ -342,6 +348,7 @@ exit:
 	return nil
 }
 
+// NewApplication initializes and returns a new Application instance with the given configuration.
 func (a AppConfig) NewApplication() (*Application, error) {
 	app := Application{
 		AppConfig: a,
@@ -380,6 +387,7 @@ func (a AppConfig) NewApplication() (*Application, error) {
 	return &app, nil
 }
 
+// matchedRuleErrorJson converts a matched WAF rule into a JSON formatted byte array for logging structured errors.
 func matchedRuleErrorJson(mr types.MatchedRule) []byte {
 	type errorLog struct {
 		Client     string   `json:"client"`
@@ -428,6 +436,7 @@ func matchedRuleErrorJson(mr types.MatchedRule) []byte {
 	return j
 }
 
+// phaseToString maps a Coraza rule phase to its string representation.
 func phaseToString(phase types.RulePhase) string {
 	switch phase {
 	case types.PhaseRequestHeaders:
@@ -445,6 +454,7 @@ func phaseToString(phase types.RulePhase) string {
 	}
 }
 
+// logCallback handles Coraza WAF match events by logging them based on rule severity and configured log format.
 func (a *Application) logCallback(mr types.MatchedRule) {
 	var l *zerolog.Event
 
@@ -467,10 +477,12 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	}
 }
 
+// ErrInterrupted is an error type representing a WAF interruption.
 type ErrInterrupted struct {
 	Interruption *types.Interruption
 }
 
+// Error implements the error interface for ErrInterrupted.
 func (e ErrInterrupted) Error() string {
 	return fmt.Sprintf("interrupted with status %d and action %s", e.Interruption.Status, e.Interruption.Action)
 }
@@ -483,12 +495,93 @@ func (e ErrInterrupted) Is(target error) bool {
 	return e.Interruption == t.Interruption
 }
 
-func countRulesHit(rules []types.MatchedRule) int64 {
+// countMatchedRules returns the number of attack rules that matched the transaction.
+func countMatchedRules(rules []types.MatchedRule) int64 {
 	var count int64
 	for _, mr := range rules {
-		if mr.Message() != "" {
-			count++
+		// Ignore rules without a message (silent control flow rules)
+		if mr.Message() == "" {
+			continue
 		}
+		if !isAttackRule(mr.Rule().ID()) {
+			continue
+		}
+		count++
 	}
 	return count
+}
+
+// getTriggeredRuleIDs returns a comma-separated string of the matched attack rule IDs.
+func getTriggeredRuleIDs(rules []types.MatchedRule) string {
+	var ids []string
+	for _, mr := range rules {
+		// Ignore rules without a message (silent control flow rules)
+		if mr.Message() == "" {
+			continue
+		}
+		// Only include actual attack rules within the CRS range
+		if !isAttackRule(mr.Rule().ID()) {
+			continue
+		}
+		ids = append(ids, strconv.Itoa(mr.Rule().ID()))
+	}
+	return strings.Join(ids, ",")
+}
+
+const (
+	// Custom Attack & Hardening Rule Ranges (Local rules)
+	MinCustomAttackID = 190000
+	MaxCustomAttackID = 199999
+
+	// CRS Attack Rule Ranges
+	MinInboundAttackID  = 910000
+	MaxInboundAttackID  = 948999
+	MinOutboundAttackID = 950000
+	MaxOutboundAttackID = 958999
+
+	// Administrative and App-Specific Ranges (as per go-ftw)
+	MinAdminRuleID   = 900000
+	MaxAdminRuleID   = 900999
+	MinAppSpecificID = 903000
+	MaxAppSpecificID = 906999
+)
+
+// isAttackRule determines if a given rule ID represents an actual attack signature
+// rather than a setup, flow-control, or whitelist rule.
+// It accepts official CRS attack ranges and custom local attack rules (190000-199999),
+// while actively ignoring CRS setup rules (900xxx), app-specific exclusions (903xxx),
+// and local infrastructure/whitelist rules (100000-189999).
+func isAttackRule(ruleID int) bool {
+	// Custom Local Attack Ranges
+	isCustomAttack := ruleID >= MinCustomAttackID && ruleID <= MaxCustomAttackID
+
+	// Standard CRS Attack Ranges
+	isInboundAttack := ruleID >= MinInboundAttackID && ruleID <= MaxInboundAttackID
+	isOutboundAttack := ruleID >= MinOutboundAttackID && ruleID <= MaxOutboundAttackID
+
+	return isCustomAttack || isInboundAttack || isOutboundAttack
+}
+
+// exportWAFMetrics writes transaction data such as hit counts and rule IDs back to the HAProxy SPOA writer.
+func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
+	// Performance optimization: Call tx.MatchedRules() only once
+	matchedRules := tx.MatchedRules()
+
+	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countMatchedRules(matchedRules))
+
+	if txState, ok := tx.(plugintypes.TransactionState); ok {
+		// 1. Read CRS anomaly score directly
+		scores := txState.Variables().TX().Get("blocking_inbound_anomaly_score")
+		if len(scores) > 0 {
+			if v, err := strconv.ParseInt(scores[0], 10, 64); err == nil {
+				_ = writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", v)
+			}
+		}
+
+		// 2. Check if the user enabled rule_ids export via coraza.cfg
+		exportRuleIDs := txState.Variables().TX().Get("spoa_export_rule_ids")
+		if len(exportRuleIDs) > 0 && exportRuleIDs[0] == "1" {
+			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", getTriggeredRuleIDs(matchedRules))
+		}
+	}
 }
