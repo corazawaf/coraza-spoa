@@ -481,7 +481,7 @@ func (e ErrInterrupted) Is(target error) bool {
 	return e.Interruption == t.Interruption
 }
 
-func countMatchedRules(rules []types.MatchedRule) int64 {
+func countRulesHit(rules []types.MatchedRule) int64 {
 	var count int64
 	for _, mr := range rules {
 		// Ignore rules without a message (silent control flow rules)
@@ -529,7 +529,7 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
 	// Performance optimization: Call tx.MatchedRules() only once
 	matchedRules := tx.MatchedRules()
 
-	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countMatchedRules(matchedRules))
+	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(matchedRules))
 
 	if txState, ok := tx.(plugintypes.TransactionState); ok {
 		// 1. Read CRS anomaly score directly
