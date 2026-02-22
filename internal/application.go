@@ -24,6 +24,7 @@ import (
 	"istio.io/istio/pkg/cache"
 )
 
+// AppConfig contains the configuration settings for the WAF application.
 type AppConfig struct {
 	Directives     string
 	ResponseCheck  bool
@@ -32,6 +33,7 @@ type AppConfig struct {
 	LogFormat      string
 }
 
+// Application represents the main WAF application wrapping the Coraza WAF engine and cache.
 type Application struct {
 	waf   coraza.WAF
 	cache cache.ExpiringCache
@@ -39,11 +41,13 @@ type Application struct {
 	AppConfig
 }
 
+// transaction struct holds a Coraza WAF transaction and a mutex for thread-safe access.
 type transaction struct {
 	tx types.Transaction
 	m  sync.Mutex
 }
 
+// applicationRequest represents the parsed HTTP request parameters coming from HAProxy.
 type applicationRequest struct {
 	SrcIp   netip.Addr
 	SrcPort int64
@@ -58,6 +62,7 @@ type applicationRequest struct {
 	Body    []byte
 }
 
+// HandleRequest processes an incoming request from HAProxy, extracts variables, and evaluates it using the Coraza WAF.
 func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	k := encoding.AcquireKVEntry()
 	// run defer via anonymous function to not directly evaluate the arguments.
@@ -205,6 +210,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 	return nil
 }
 
+// readHeaders parses raw HTTP headers from HAProxy and feeds them into the WAF transaction via callbacks.
 func readHeaders(headers []byte, hdrCallback func(key string, value string), hostCallback func(value string)) error {
 	s := bufio.NewScanner(bytes.NewReader(headers))
 	for s.Scan() {
@@ -230,6 +236,7 @@ func readHeaders(headers []byte, hdrCallback func(key string, value string), hos
 	return nil
 }
 
+// applicationResponse represents the parsed HTTP response parameters coming from HAProxy.
 type applicationResponse struct {
 	ID      string
 	Version string
@@ -238,6 +245,7 @@ type applicationResponse struct {
 	Body    []byte
 }
 
+// HandleResponse evaluates an outgoing HTTP response from the backend server against WAF rules.
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	if !a.ResponseCheck {
 		return fmt.Errorf("got response but response check is disabled")
@@ -340,6 +348,7 @@ exit:
 	return nil
 }
 
+// NewApplication initializes and returns a new Application instance with the given configuration.
 func (a AppConfig) NewApplication() (*Application, error) {
 	app := Application{
 		AppConfig: a,
@@ -378,6 +387,7 @@ func (a AppConfig) NewApplication() (*Application, error) {
 	return &app, nil
 }
 
+// matchedRuleErrorJson converts a matched WAF rule into a JSON formatted byte array for logging structured errors.
 func matchedRuleErrorJson(mr types.MatchedRule) []byte {
 	type errorLog struct {
 		Client     string   `json:"client"`
@@ -426,6 +436,7 @@ func matchedRuleErrorJson(mr types.MatchedRule) []byte {
 	return j
 }
 
+// phaseToString maps a Coraza rule phase to its string representation.
 func phaseToString(phase types.RulePhase) string {
 	switch phase {
 	case types.PhaseRequestHeaders:
@@ -443,6 +454,7 @@ func phaseToString(phase types.RulePhase) string {
 	}
 }
 
+// logCallback handles Coraza WAF match events by logging them based on rule severity and configured log format.
 func (a *Application) logCallback(mr types.MatchedRule) {
 	var l *zerolog.Event
 
@@ -465,10 +477,12 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	}
 }
 
+// ErrInterrupted is an error type representing a WAF interruption.
 type ErrInterrupted struct {
 	Interruption *types.Interruption
 }
 
+// Error implements the error interface for ErrInterrupted.
 func (e ErrInterrupted) Error() string {
 	return fmt.Sprintf("interrupted with status %d and action %s", e.Interruption.Status, e.Interruption.Action)
 }
@@ -515,6 +529,10 @@ func getTriggeredRuleIDs(rules []types.MatchedRule) string {
 }
 
 const (
+	// Custom Attack & Hardening Rule Ranges (Local rules)
+	MinCustomAttackID = 190000
+	MaxCustomAttackID = 199999
+
 	// CRS Attack Rule Ranges
 	MinInboundAttackID  = 910000
 	MaxInboundAttackID  = 948999
@@ -528,18 +546,23 @@ const (
 	MaxAppSpecificID = 906999
 )
 
-// isAttackRule checks if the rule ID belongs to the actual CRS attack
-// or administrative ranges, following the go-ftw engine implementation.
-// isAttackRule checks if the rule ID belongs to the actual CRS attack ranges.
-// Setup rules (900xxx) and App-specific exclusions (903xxx) are ignored.
+// isAttackRule determines if a given rule ID represents an actual attack signature
+// rather than a setup, flow-control, or whitelist rule.
+// It accepts official CRS attack ranges and custom local attack rules (190000-199999),
+// while actively ignoring CRS setup rules (900xxx), app-specific exclusions (903xxx),
+// and local infrastructure/whitelist rules (100000-189999).
 func isAttackRule(ruleID int) bool {
-	// Standard Attack Ranges
+	// Custom Local Attack Ranges
+	isCustomAttack := ruleID >= MinCustomAttackID && ruleID <= MaxCustomAttackID
+
+	// Standard CRS Attack Ranges
 	isInboundAttack := ruleID >= MinInboundAttackID && ruleID <= MaxInboundAttackID
 	isOutboundAttack := ruleID >= MinOutboundAttackID && ruleID <= MaxOutboundAttackID
 
-	return isInboundAttack || isOutboundAttack
+	return isCustomAttack || isInboundAttack || isOutboundAttack
 }
 
+// exportWAFMetrics writes transaction data such as hit counts and rule IDs back to the HAProxy SPOA writer.
 func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
 	// Performance optimization: Call tx.MatchedRules() only once
 	matchedRules := tx.MatchedRules()

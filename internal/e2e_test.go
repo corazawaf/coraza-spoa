@@ -99,7 +99,7 @@ func TestE2E(t *testing.T) {
 		t.Run("Malicious request (rule_ids explicitly enabled)", func(t *testing.T) {
 			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/?e2e_attack=1", http.NoBody)
 			req.Header.Set("coraza-e2e", "ok")
-			// Inject the header that triggers rule 930000 to enable export
+			// Inject the header that triggers rule 192000 to enable export
 			req.Header.Set("X-Enable-Rule-Ids", "1")
 
 			resp, err := http.DefaultClient.Do(req)
@@ -113,8 +113,8 @@ func TestE2E(t *testing.T) {
 
 			// Should export rule_ids because the feature was toggled on
 			ruleIDs := resp.Header.Get("X-Rule-IDs")
-			if ruleIDs != "920000" {
-				t.Errorf("expected rule_ids to contain '920000', got '%s'", ruleIDs)
+			if ruleIDs != "192000" {
+				t.Errorf("expected rule_ids to contain '192000', got '%s'", ruleIDs)
 			}
 		})
 	})
@@ -129,8 +129,8 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 
 	appCfg := AppConfig{
 		Directives: e2e.Directives + `
-SecRule REQUEST_HEADERS:x-enable-rule-ids "@streq 1" "id:930000,phase:1,pass,nolog,setvar:'tx.spoa_export_rule_ids=1'"
-SecRule ARGS:e2e_attack "@streq 1" "id:920000,phase:1,deny,status:403,msg:'E2E Attack',log,severity:'CRITICAL',setvar:'tx.blocking_inbound_anomaly_score=+5'"
+SecRule REQUEST_HEADERS:x-enable-rule-ids "@streq 1" "id:100010,phase:1,pass,nolog,setvar:'tx.spoa_export_rule_ids=1'"
+SecRule ARGS:e2e_attack "@streq 1" "id:192000,phase:1,deny,status:403,msg:'E2E Attack',log,severity:'CRITICAL',setvar:'tx.blocking_inbound_anomaly_score=+5'"
 `,
 		ResponseCheck:  true,
 		Logger:         logger,
