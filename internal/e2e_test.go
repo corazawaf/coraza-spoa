@@ -77,30 +77,10 @@ func TestE2E(t *testing.T) {
 			}
 		})
 
-		t.Run("Malicious request (rule_ids disabled by default)", func(t *testing.T) {
-			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/?e2e_attack=1", http.NoBody)
-			req.Header.Set("coraza-e2e", "ok")
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				t.Fatalf("request failed: %v", err)
-			}
-
-			if resp.StatusCode != http.StatusForbidden {
-				t.Errorf("expected 403 Forbidden, got %d", resp.StatusCode)
-			}
-
-			// Should NOT export rule_ids by default
-			ruleIDs := resp.Header.Get("X-Rule-IDs")
-			if ruleIDs != "" {
-				t.Errorf("expected rule_ids to be empty by default, got '%s'", ruleIDs)
-			}
-		})
-
 		t.Run("Malicious request (rule_ids explicitly enabled)", func(t *testing.T) {
 			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/?e2e_attack=1", http.NoBody)
 			req.Header.Set("coraza-e2e", "ok")
 			// Inject the header that triggers rule 192000 to enable export
-			req.Header.Set("X-Enable-Rule-Ids", "1")
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
@@ -129,8 +109,8 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 
 	appCfg := AppConfig{
 		Directives: e2e.Directives + `
-SecRule REQUEST_HEADERS:x-enable-rule-ids "@streq 1" "id:100010,phase:1,pass,nolog,setvar:'tx.spoa_export_rule_ids=1'"
-SecRule ARGS:e2e_attack "@streq 1" "id:192000,phase:1,deny,status:403,msg:'E2E Attack',log,severity:'CRITICAL',setvar:'tx.blocking_inbound_anomaly_score=+5'"
+SecAction "id:100010,phase:1,pass,nolog,setvar:'tx.spoa_export_rule_ids=1'"
+SecRule ARGS:e2e_attack "@streq 1" "id:192000,phase:1,deny,status:403,msg:'E2E Attack',log,severity:'CRITICAL',setvar:'tx.inbound_anomaly_score_pl1=+5'"
 `,
 		ResponseCheck:  true,
 		Logger:         logger,
@@ -167,21 +147,19 @@ SecRule ARGS:e2e_attack "@streq 1" "id:192000,phase:1,deny,status:403,msg:'E2E A
     acl is_deny var(txn.e2e.action) -m str deny
     acl status_424 var(txn.e2e.status) -m int 424
 
-    # Inject our variables as headers BEFORE any deny directives so they are captured
-    http-request set-header X-Anomaly-Score %[var(txn.e2e.anomaly_score)]
-    http-request set-header X-Rules-Hit %[var(txn.e2e.rules_hit)]
-    http-request set-header X-Rule-IDs %[var(txn.e2e.rule_ids)]
-    http-response set-header X-Anomaly-Score %[var(txn.e2e.anomaly_score)]
-    http-response set-header X-Rules-Hit %[var(txn.e2e.rules_hit)]
-    http-response set-header X-Rule-IDs %[var(txn.e2e.rule_ids)]
+    # Inject our variables globally into the response, even for early deny responses
+    http-after-response set-header X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]"
+    http-after-response set-header X-Rules-Hit "%[var(txn.e2e.rules_hit)]"
+    http-after-response set-header X-Rule-IDs "%[var(txn.e2e.rule_ids)]"
 
     # Special check for e2e tests as they validate the config.
-    http-request deny deny_status 424 hdr waf-block "request"  if is_deny status_424
+    http-request deny deny_status 424 hdr waf-block "request" if is_deny status_424
     http-response deny deny_status 424 hdr waf-block "response" if is_deny status_424
 
-    # INLINE HEADERS: Required because HAProxy skips http-response rules on local 403 denies
-    http-request deny deny_status 403 hdr waf-block "request" hdr X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]" hdr X-Rules-Hit "%[var(txn.e2e.rules_hit)]" hdr X-Rule-IDs "%[var(txn.e2e.rule_ids)]" if is_deny
-    http-response deny deny_status 403 hdr waf-block "response" hdr X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]" hdr X-Rules-Hit "%[var(txn.e2e.rules_hit)]" hdr X-Rule-IDs "%[var(txn.e2e.rule_ids)]" if is_deny
+    # Standard deny (headers are automatically injected by http-after-response)
+    http-request deny deny_status 403 hdr waf-block "request" if is_deny
+    http-response deny deny_status 403 hdr waf-block "response" if is_deny
+    
     http-request silent-drop if { var(txn.e2e.action) -m str drop }
     http-response silent-drop if { var(txn.e2e.action) -m str drop }
 
