@@ -18,58 +18,14 @@ applications:
     # Some example rules.
     # The built-in OWASP CRS rules are available in @owasp_crs/
     directives: |
-
-      # ------------------------------------------------------------------------
-      # AGENT FEATURE TOGGLES
-      # ------------------------------------------------------------------------
+      
       # Enable the export of triggered Rule IDs to HAProxy via the 'rule_ids' 
-      # variable. This is required for the custom metrics and logging integration.
       # ID: 100010 (Infrastructure range - will not be counted as an attack)
       #SecAction "id:100010,phase:1,nolog,pass,setvar:tx.spoa_export_rule_ids=1"
       
       Include @coraza.conf-recommended
       Include @crs-setup.conf.example
       Include @owasp_crs/*.conf
-
-      # ------------------------------------------------------------------------
-      # CUSTOM RULES & ID RANGES ALLOCATION
-      # ------------------------------------------------------------------------
-      # To avoid conflicts with the OWASP Core Rule Set (CRS) and to ensure that
-      # the SPOA agent exports accurate metrics to HAProxy (rules_hit & rule_ids),
-      # please strictly adhere to the following Rule ID ranges for local rules:
-      #
-      # 1. INFRASTRUCTURE & WHITELISTS (IDs: 100000 - 189999)
-      #    Use this range for IP whitelists, disabling specific CRS rules, or
-      #    tuning (e.g., GeoIP limits). 
-      #    -> BEHAVIOR: Rules in this range are INTENTIONALLY IGNORED by the 
-      #       SPOA agent's attack counter to prevent false positives in HAProxy.
-      #
-      # 2. CUSTOM ATTACK & HARDENING RULES (IDs: 190000 - 199999)
-      #    Use this range for actual security blocks and custom hardening rules.
-      #    -> BEHAVIOR: Rules in this range are actively monitored. If triggered,
-      #       they will increment the 'rules_hit' counter and their IDs will be
-      #       exported in the 'rule_ids' variable to HAProxy logs.
-      #
-      # IMPORTANT PLACEMENT RULE: 
-      # Custom hardening rules MUST be placed AFTER the inclusion of the main 
-      # CRS rules (e.g., after `Include @owasp_crs/*.conf` or your specific 
-      # CRS path). This ensures that the anomaly scoring variables are properly 
-      # initialized by the CRS before these rules attempt to add points to them.
-      # ------------------------------------------------------------------------
-
-      # ------------------------------------------------------------------------
-      # CUSTOM HARDENING RULES (Requires IDs 190000+)
-      # ------------------------------------------------------------------------
-      
-      ## HARDENING BLOCK: (Adds 15 points to the previously initialized anomaly score bucket)
-      #SecRule REQUEST_URI "@rx ^/(?:wp-includes|wp-content/uploads)/.*\.php$" \
-      #  "id:190500, \
-      #  phase:1, \
-      #  pass, \
-      #  log, \
-      #  msg:'HARDENING BLOCK: Direct execution of internal PHP script attempted', \
-      #  tag:'wordpress_hardening', \
-      #  setvar:'tx.inbound_anomaly_score_pl1=+15'"
 
       SecRuleEngine On
 
