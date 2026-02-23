@@ -528,7 +528,22 @@ func isAttackRule(ruleID int) bool {
 func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
 	// Performance optimization: Call tx.MatchedRules() only once
 	matchedRules := tx.MatchedRules()
-
+    ids := make([]string, len(matchedRules))
+    var count int64
+	for _, mr := range rules {
+		// Ignore rules without a message (silent control flow rules)
+		if mr.Message() == "" {
+			continue
+		}
+		// Only include actual attack rules within the CRS range
+		if !isAttackRule(mr.Rule().ID()) {
+			continue
+		}
+		if exportRuleIDs {
+		  		ids = append(ids, strconv.Itoa(mr.Rule().ID()))
+		}
+		count++
+	}
 	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(matchedRules))
 
 	if txState, ok := tx.(plugintypes.TransactionState); ok {
