@@ -519,7 +519,7 @@ func isAttackRule(ruleID int) bool {
 	isFTWAttack := (ruleID >= 910000 && ruleID < 950000) || (ruleID >= 950000 && ruleID < 960000)
 
 	// Custom Local Attack Ranges (e.g., local hardening rules)
-	isCustomAttack := ruleID >= 190000 && ruleID <= 199999
+	isCustomAttack := ruleID >= 190000 && ruleID < 200000
 
 	return isFTWAttack || isCustomAttack
 }
