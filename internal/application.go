@@ -557,7 +557,9 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
 
 		// 2. Check if the user enabled rule_ids export via coraza.cfg
 		exportRuleIDs := txState.Variables().TX().Get("spoa_export_rule_ids")
-		if len(exportRuleIDs) > 0 && exportRuleIDs[0] == "1" {
+		if exportRuleIDs {
+		  			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ","))
+
 			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", getTriggeredRuleIDs(matchedRules))
 		}
 	}
