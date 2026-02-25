@@ -18,15 +18,9 @@ applications:
     # Some example rules.
     # The built-in OWASP CRS rules are available in @owasp_crs/
     directives: |
-      
-      # Enable the export of triggered Rule IDs to HAProxy via the 'rule_ids' 
-      # ID: 100010 (Infrastructure range - will not be counted as an attack)
-      #SecAction "id:100010,phase:1,nolog,pass,setvar:tx.spoa_export_rule_ids=1"
-      
       Include @coraza.conf-recommended
       Include @crs-setup.conf.example
       Include @owasp_crs/*.conf
-
       SecRuleEngine On
 
     # HAProxy configured to send requests only, that means no cache required

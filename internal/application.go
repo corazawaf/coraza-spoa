@@ -498,10 +498,10 @@ func isAttackRule(ruleID int) bool {
 	return isFTWAttack || isCustomAttack
 }
 
-func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, ExportRuleIDs bool) {
+func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, exportRuleIDs bool) error {
 	matchedRules := tx.MatchedRules()
 	var ids []string
-	if ExportRuleIDs {
+	if exportRuleIDs {
 		ids = make([]string, 0, len(matchedRules))
 	}
 	var count int64
@@ -515,24 +515,35 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, Expor
 			continue
 		}
 
-		if ExportRuleIDs {
+		if exportRuleIDs {
 			ids = append(ids, strconv.Itoa(mr.Rule().ID()))
 		}
 		count++
 	}
-	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count)
+	if err := writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count); err != nil {
+		return err
+	}
 
 	if txState, ok := tx.(plugintypes.TransactionState); ok {
-		// Read CRS anomaly score directly
 		scores := txState.Variables().TX().Get("blocking_inbound_anomaly_score")
-		if len(scores) > 0 {
-			if v, err := strconv.ParseInt(scores[0], 10, 64); err == nil {
-				_ = writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", v)
+		var score int64
+		if len(scores) != 0 {
+			v, err := strconv.ParseInt(scores[0], 10, 64)
+			if err != nil {
+				return err
 			}
+			score = v
+		}
+		if err := writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", score); err != nil {
+			return err
 		}
 
-		if ExportRuleIDs {
-			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ","))
+		if exportRuleIDs {
+			if err := writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ",")); err != nil {
+				return err
+			}
 		}
 	}
+
+	return nil
 }

@@ -20,7 +20,7 @@ import (
 
 func TestE2E(t *testing.T) {
 	t.Run("coraza e2e suite", func(t *testing.T) {
-		config, bin, _ := runCoraza(t)
+		config, bin, _ := runCoraza(t, e2e.Directives)
 		err := e2e.Run(e2e.Config{
 			NulledBody:        false,
 			ProxiedEntrypoint: "http://127.0.0.1:" + config.FrontendPort,
@@ -31,7 +31,7 @@ func TestE2E(t *testing.T) {
 		}
 	})
 	t.Run("high request rate", func(t *testing.T) {
-		config, _, _ := runCoraza(t)
+		config, _, _ := runCoraza(t, e2e.Directives)
 
 		if os.Getenv("CI") != "" {
 			t.Skip("CI is too slow for this test.")
@@ -56,62 +56,70 @@ func TestE2E(t *testing.T) {
 		wg.Wait()
 	})
 
-	t.Run("waf metrics export", func(t *testing.T) {
-		config, _, _ := runCoraza(t)
+	const defaultCorazaConfig = `
+Include @coraza.conf-recommended
+Include @crs-setup.conf.example
+Include @owasp_crs/*.conf
+SecRuleEngine On
+`
+	t.Run("default config", func(t *testing.T) {
+		config, _, _ := runCoraza(t, defaultCorazaConfig)
 
-		t.Run("Clean request", func(t *testing.T) {
-			// Send a legitimate request that should pass without triggering attack rules
-			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/", http.NoBody)
+		t.Run("metrics for clean", func(t *testing.T) {
+			// We have to access via localhost to prevent 920350 matching.
+			req, _ := http.NewRequest("GET", "http://localhost:"+config.FrontendPort+"/", http.NoBody)
 			req.Header.Set("coraza-e2e", "ok")
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
+			defer resp.Body.Close()
 
-			if score := resp.Header.Get("X-Anomaly-Score"); score != "0" && score != "" {
-				t.Errorf("expected anomaly score 0 or empty for normal request, got '%s'", score)
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusOK, resp.StatusCode)
 			}
 
-			if matched := resp.Header.Get("X-Rules-Hit"); matched != "0" && matched != "" {
-				t.Errorf("expected matched rules 0 or empty for normal request, got '%s'", matched)
+			if anomalyScore := resp.Header.Get("X-Anomaly-Score"); anomalyScore != "0" {
+				t.Errorf("expected X-Anomaly-Score to be %q, got %q", "0", anomalyScore)
+			}
+
+			if ruleIDs := resp.Header.Get("X-Rule-IDs"); ruleIDs != "" {
+				t.Errorf("expected rule_ids to be empty")
 			}
 		})
 
-		t.Run("Malicious request (rule_ids explicitly enabled)", func(t *testing.T) {
-			// Usamos o payload que aciona a regra 9411 do e2e
+		t.Run("metrics for malicious", func(t *testing.T) {
 			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/anything?arg=<script>alert(0)</script>", http.NoBody)
-			res, err := http.DefaultClient.Do(req)
+			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
-			defer res.Body.Close()
+			defer resp.Body.Close()
 
-			if res.StatusCode == http.StatusOK {
-				t.Errorf("expected request to be denied, but got 200 OK")
+			if resp.StatusCode != http.StatusForbidden {
+				t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusForbidden, resp.StatusCode)
 			}
 
-			anomalyScore := res.Header.Get("X-Anomaly-Score")
-			if anomalyScore != "" {
-				t.Errorf("expected X-Anomaly-Score to be empty for e2e rules, got '%s'", anomalyScore)
+			if anomalyScore := resp.Header.Get("X-Anomaly-Score"); anomalyScore == "0" {
+				t.Errorf("expected X-Anomaly-Score to not be %q, got %q", "0", anomalyScore)
 			}
 
-			ruleIDs := res.Header.Get("X-Rule-IDs")
-			if ruleIDs != "" {
-				t.Errorf("expected rule_ids to be empty (filtered out), got '%s'", ruleIDs)
+			if ruleIDs := resp.Header.Get("X-Rule-IDs"); ruleIDs == "" {
+				t.Errorf("expected rule_ids to be not empty")
 			}
 		})
 	})
 
 }
 
-func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
+func runCoraza(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
 	s := httptest.NewServer(httpbin.New())
 	tb.Cleanup(s.Close)
 
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	appCfg := AppConfig{
-		Directives:     e2e.Directives,
+		Directives:     directives,
 		ResponseCheck:  true,
 		Logger:         logger,
 		TransactionTTL: 10 * time.Second,
@@ -147,7 +155,6 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
     acl is_deny var(txn.e2e.action) -m str deny
     acl status_424 var(txn.e2e.status) -m int 424
 
-    # Inject our variables globally into the response, even for early deny responses
     http-after-response set-header X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]"
     http-after-response set-header X-Rules-Hit "%[var(txn.e2e.rules_hit)]"
     http-after-response set-header X-Rule-IDs "%[var(txn.e2e.rule_ids)]"
@@ -156,7 +163,6 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
     http-request deny deny_status 424 hdr waf-block "request" if is_deny status_424
     http-response deny deny_status 424 hdr waf-block "response" if is_deny status_424
 
-    # Standard deny (headers are automatically injected by http-after-response)
     http-request deny deny_status 403 hdr waf-block "request" if is_deny
     http-response deny deny_status 403 hdr waf-block "response" if is_deny
     
@@ -166,7 +172,6 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
     # Deny in case of an error, when processing with the Coraza SPOA
     http-request deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
     http-response deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
-    
 `,
 		EngineConfig: `
 [e2e]
