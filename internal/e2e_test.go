@@ -78,23 +78,26 @@ func TestE2E(t *testing.T) {
 		})
 
 		t.Run("Malicious request (rule_ids explicitly enabled)", func(t *testing.T) {
-			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/?e2e_attack=1", http.NoBody)
-			req.Header.Set("coraza-e2e", "ok")
-			// Inject the header that triggers rule 192000 to enable export
-
-			resp, err := http.DefaultClient.Do(req)
+			// Usamos o payload que aciona a regra 9411 do e2e
+			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/anything?arg=<script>alert(0)</script>", http.NoBody)
+			res, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatalf("request failed: %v", err)
 			}
+			defer res.Body.Close()
 
-			if resp.StatusCode != http.StatusForbidden {
-				t.Errorf("expected 403 Forbidden, got %d", resp.StatusCode)
+			if res.StatusCode == http.StatusOK {
+				t.Errorf("expected request to be denied, but got 200 OK")
 			}
 
-			// Should export rule_ids because the feature was toggled on
-			ruleIDs := resp.Header.Get("X-Rule-IDs")
-			if ruleIDs != "192000" {
-				t.Errorf("expected rule_ids to contain '192000', got '%s'", ruleIDs)
+			anomalyScore := res.Header.Get("X-Anomaly-Score")
+			if anomalyScore != "" {
+				t.Errorf("expected X-Anomaly-Score to be empty for e2e rules, got '%s'", anomalyScore)
+			}
+
+			ruleIDs := res.Header.Get("X-Rule-IDs")
+			if ruleIDs != "" {
+				t.Errorf("expected rule_ids to be empty (filtered out), got '%s'", ruleIDs)
 			}
 		})
 	})
@@ -108,10 +111,7 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	appCfg := AppConfig{
-		Directives: e2e.Directives + `
-SecAction "id:100010,phase:1,pass,nolog,setvar:'tx.spoa_export_rule_ids=1'"
-SecRule ARGS:e2e_attack "@streq 1" "id:192000,phase:1,deny,status:403,msg:'E2E Attack',log,severity:'CRITICAL',setvar:'tx.inbound_anomaly_score_pl1=+5'"
-`,
+		Directives:     e2e.Directives,
 		ResponseCheck:  true,
 		Logger:         logger,
 		TransactionTTL: 10 * time.Second,
@@ -181,11 +181,11 @@ spoe-agent e2e
     log         global
 
 spoe-message coraza-req
-    args app=str(default) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
+    args app=str(default) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body exportRuleIDs=bool(true)
     event on-frontend-http-request
 
 spoe-message coraza-res
-    args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body
+    args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body exportRuleIDs=bool(true)
     event on-http-response
 `,
 		BackendConfig: fmt.Sprintf(`

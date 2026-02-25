@@ -82,7 +82,7 @@ The agent populates the following variables in the `txn` scope:
 * **`txn.coraza.status`**: The HTTP status code determined by the WAF (e.g., 403).
 * **`txn.coraza.anomaly_score`**: The total inbound anomaly score for the request.
 * **`txn.coraza.rules_hit`**: The total count of triggered attack rules.
-* **`txn.coraza.rule_ids`**: A comma-separated list of triggered Rule IDs.
+* **`txn.coraza.rule_ids`**: A comma-separated list of triggered Rule IDs (if enabled).
 * **`txn.coraza.error`**: Contains SPOA-related errors if the transaction fails.
 
 ### Example Log Formats
@@ -100,9 +100,15 @@ log-format "%ci:%cp\ [%t]\ %ft\ %b/%s\ %Th/%Ti/%TR/%Tq/%Tw/%Tc/%Tr/%Tt\ %ST\ %B\
 Use this if you need to identify exactly which rules were triggered to troubleshoot false positives. 
 
 > **Note:** Exporting the specific Rule IDs requires explicit activation in your Coraza configuration.
-```coraza-spoa.yaml
-  SecAction "id:100010,phase:1,nolog,pass,setvar:tx.spoa_export_rule_ids=1"
-  Include @coraza.conf
+```coraza.cfg
+spoe-message coraza-req
+    
+    args app= ... exportRuleIDs=bool(true)
+
+spoe-message coraza-res
+    
+    args app= ... exportRuleIDs=bool(true)
+
   .....
 ```
 ```haproxy
@@ -115,25 +121,6 @@ To avoid conflicts with the OWASP Core Rule Set (CRS) and to ensure that the SPO
 
 * **Infrastructure & Whitelists (IDs: 100000 - 189999):** Use this range for IP whitelists, disabling specific CRS rules, or tuning (e.g., GeoIP limits). Rules in this range are **intentionally ignored** by the SPOA agent's attack counter to prevent false positives in your HAProxy metrics.
 * **Custom Attack & Hardening Rules (IDs: 190000 - 199999):** Use this range for actual security blocks and custom hardening rules. Rules in this range are actively monitored. If triggered, they will increment the `rules_hit` counter and their IDs will be exported in the `rule_ids` variable.
-
-#### Example: WordPress Hardening Rule
-
-Below is an example of a custom hardening rule designed to protect WordPress environments by preventing the direct execution of internal PHP scripts inside the `wp-includes` and `wp-content/uploads` directories. 
-
-**Crucial Placement Rule:** This rule (and any custom hardening rule) **MUST be placed AFTER the inclusion of the main CRS rules** (e.g., after `Include /etc/coraza-spoa/owasp-crs/rules/*.conf` or your specific CRS path). Placing it here ensures that the anomaly scoring variables (like `tx.inbound_anomaly_score_pl1`) are properly initialized by the CRS before your custom rule attempts to add points to them.
-
-```yaml
-      # HARDENING BLOCK: (Adds 15 points to the previously initialized anomaly score bucket)
-      # Example: WordPress protection against direct internal PHP execution
-      #SecRule REQUEST_URI "@rx ^/(?:wp-includes|wp-content/uploads)/.*\.php$" \
-      #  "id:190500, \
-      #  phase:1, \
-      #  pass, \
-      #  log, \
-      #  msg:'HARDENING BLOCK: Direct execution of internal PHP script attempted', \
-      #  tag:'wordpress_hardening', \
-      #  setvar:'tx.inbound_anomaly_score_pl1=+15'"
-```
 
 ## Docker
 

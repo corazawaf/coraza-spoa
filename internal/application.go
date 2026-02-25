@@ -45,17 +45,18 @@ type transaction struct {
 }
 
 type applicationRequest struct {
-	SrcIp   netip.Addr
-	SrcPort int64
-	DstIp   netip.Addr
-	DstPort int64
-	Method  string
-	ID      string
-	Path    []byte
-	Query   []byte
-	Version string
-	Headers []byte
-	Body    []byte
+	SrcIp         netip.Addr
+	SrcPort       int64
+	DstIp         netip.Addr
+	DstPort       int64
+	Method        string
+	ID            string
+	Path          []byte
+	Query         []byte
+	Version       string
+	Headers       []byte
+	Body          []byte
+	ExportRuleIDs bool
 }
 
 func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
@@ -127,6 +128,8 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 			k = encoding.AcquireKVEntry()
 		case "id":
 			req.ID = string(k.ValueBytes())
+		case "exportRuleIDs":
+			req.ExportRuleIDs = k.ValueBool()
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
@@ -156,7 +159,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		}
 	}()
 
-	defer exportWAFMetrics(writer, tx)
+	defer exportWAFMetrics(writer, tx, req.ExportRuleIDs)
 
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
@@ -231,11 +234,12 @@ func readHeaders(headers []byte, hdrCallback func(key string, value string), hos
 }
 
 type applicationResponse struct {
-	ID      string
-	Version string
-	Status  int64
-	Headers []byte
-	Body    []byte
+	ID            string
+	Version       string
+	Status        int64
+	Headers       []byte
+	Body          []byte
+	ExportRuleIDs bool
 }
 
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
@@ -280,6 +284,8 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			res.Body = currK.ValueBytes()
 			// acquire a new kv entry to continue reading other message values.
 			k = encoding.AcquireKVEntry()
+		case "exportRuleIDs":
+			res.ExportRuleIDs = k.ValueBool()
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
@@ -308,7 +314,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		}
 	}()
 
-	defer exportWAFMetrics(writer, tx)
+	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs)
 
 	if tx.IsRuleEngineOff() {
 		goto exit
@@ -481,38 +487,6 @@ func (e ErrInterrupted) Is(target error) bool {
 	return e.Interruption == t.Interruption
 }
 
-func countRulesHit(rules []types.MatchedRule) int64 {
-	var count int64
-	for _, mr := range rules {
-		// Ignore rules without a message (silent control flow rules)
-		if mr.Message() == "" {
-			continue
-		}
-		if !isAttackRule(mr.Rule().ID()) {
-			continue
-		}
-		count++
-	}
-	return count
-}
-
-func getTriggeredRuleIDs(rules []types.MatchedRule) string {
-	var ids []string
-	for _, mr := range rules {
-		// Ignore rules without a message (silent control flow rules)
-		if mr.Message() == "" {
-			continue
-		}
-		// Only include actual attack rules within the CRS range
-		if !isAttackRule(mr.Rule().ID()) {
-			continue
-		}
-		ids = append(ids, strconv.Itoa(mr.Rule().ID()))
-	}
-	return strings.Join(ids, ",")
-}
-
-// isAttackRule checks if the ruleID is considered an attack rule.
 // The CRS ranges logic is copied from go-ftw (https://github.com/coreruleset/go-ftw).
 func isAttackRule(ruleID int) bool {
 	// Standard CRS Attack Ranges (from go-ftw)
@@ -524,13 +498,14 @@ func isAttackRule(ruleID int) bool {
 	return isFTWAttack || isCustomAttack
 }
 
-// exportWAFMetrics writes transaction data such as hit counts and rule IDs back to the HAProxy SPOA writer.
-func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
-	// Performance optimization: Call tx.MatchedRules() only once
+func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, ExportRuleIDs bool) {
 	matchedRules := tx.MatchedRules()
-    ids := make([]string, len(matchedRules))
-    var count int64
-	for _, mr := range rules {
+	var ids []string
+	if ExportRuleIDs {
+		ids = make([]string, 0, len(matchedRules))
+	}
+	var count int64
+	for _, mr := range matchedRules {
 		// Ignore rules without a message (silent control flow rules)
 		if mr.Message() == "" {
 			continue
@@ -539,15 +514,16 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
 		if !isAttackRule(mr.Rule().ID()) {
 			continue
 		}
-		if exportRuleIDs {
-		  		ids = append(ids, strconv.Itoa(mr.Rule().ID()))
+
+		if ExportRuleIDs {
+			ids = append(ids, strconv.Itoa(mr.Rule().ID()))
 		}
 		count++
 	}
-	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(matchedRules))
+	_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count)
 
 	if txState, ok := tx.(plugintypes.TransactionState); ok {
-		// 1. Read CRS anomaly score directly
+		// Read CRS anomaly score directly
 		scores := txState.Variables().TX().Get("blocking_inbound_anomaly_score")
 		if len(scores) > 0 {
 			if v, err := strconv.ParseInt(scores[0], 10, 64); err == nil {
@@ -555,12 +531,8 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction) {
 			}
 		}
 
-		// 2. Check if the user enabled rule_ids export via coraza.cfg
-		exportRuleIDs := txState.Variables().TX().Get("spoa_export_rule_ids")
-		if exportRuleIDs {
-		  			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ","))
-
-			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", getTriggeredRuleIDs(matchedRules))
+		if ExportRuleIDs {
+			_ = writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ","))
 		}
 	}
 }
