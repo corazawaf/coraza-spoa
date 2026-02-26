@@ -20,7 +20,7 @@ import (
 
 func TestE2E(t *testing.T) {
 	t.Run("coraza e2e suite", func(t *testing.T) {
-		config, bin, _ := runCoraza(t)
+		config, bin, _ := runCoraza(t, e2e.Directives)
 		err := e2e.Run(e2e.Config{
 			NulledBody:        false,
 			ProxiedEntrypoint: "http://127.0.0.1:" + config.FrontendPort,
@@ -31,7 +31,7 @@ func TestE2E(t *testing.T) {
 		}
 	})
 	t.Run("high request rate", func(t *testing.T) {
-		config, _, _ := runCoraza(t)
+		config, _, _ := runCoraza(t, e2e.Directives)
 
 		if os.Getenv("CI") != "" {
 			t.Skip("CI is too slow for this test.")
@@ -55,16 +55,71 @@ func TestE2E(t *testing.T) {
 
 		wg.Wait()
 	})
+
+	const defaultCorazaConfig = `
+Include @coraza.conf-recommended
+Include @crs-setup.conf.example
+Include @owasp_crs/*.conf
+SecRuleEngine On
+`
+	t.Run("default config", func(t *testing.T) {
+		config, _, _ := runCoraza(t, defaultCorazaConfig)
+
+		t.Run("metrics for clean", func(t *testing.T) {
+			// We have to access via localhost to prevent 920350 matching.
+			req, _ := http.NewRequest("GET", "http://localhost:"+config.FrontendPort+"/", http.NoBody)
+			req.Header.Set("coraza-e2e", "ok")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusOK, resp.StatusCode)
+			}
+
+			if anomalyScore := resp.Header.Get("X-Anomaly-Score"); anomalyScore != "0" {
+				t.Errorf("expected X-Anomaly-Score to be %q, got %q", "0", anomalyScore)
+			}
+
+			if ruleIDs := resp.Header.Get("X-Rule-IDs"); ruleIDs != "" {
+				t.Errorf("expected rule_ids to be empty")
+			}
+		})
+
+		t.Run("metrics for malicious", func(t *testing.T) {
+			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/anything?arg=<script>alert(0)</script>", http.NoBody)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusForbidden {
+				t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusForbidden, resp.StatusCode)
+			}
+
+			if anomalyScore := resp.Header.Get("X-Anomaly-Score"); anomalyScore == "0" {
+				t.Errorf("expected X-Anomaly-Score to not be %q, got %q", "0", anomalyScore)
+			}
+
+			if ruleIDs := resp.Header.Get("X-Rule-IDs"); ruleIDs == "" {
+				t.Errorf("expected rule_ids to be not empty")
+			}
+		})
+	})
+
 }
 
-func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
+func runCoraza(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
 	s := httptest.NewServer(httpbin.New())
 	tb.Cleanup(s.Close)
 
 	logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
 
 	appCfg := AppConfig{
-		Directives:     e2e.Directives,
+		Directives:     directives,
 		ResponseCheck:  true,
 		Logger:         logger,
 		TransactionTTL: 10 * time.Second,
@@ -100,13 +155,17 @@ func runCoraza(tb testing.TB) (testutil.HAProxyConfig, string, string) {
     acl is_deny var(txn.e2e.action) -m str deny
     acl status_424 var(txn.e2e.status) -m int 424
 
+    http-after-response set-header X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]"
+    http-after-response set-header X-Rules-Hit "%[var(txn.e2e.rules_hit)]"
+    http-after-response set-header X-Rule-IDs "%[var(txn.e2e.rule_ids)]"
+
     # Special check for e2e tests as they validate the config.
-    http-request deny deny_status 424 hdr waf-block "request"  if is_deny status_424
+    http-request deny deny_status 424 hdr waf-block "request" if is_deny status_424
     http-response deny deny_status 424 hdr waf-block "response" if is_deny status_424
 
-    http-request deny deny_status 403 hdr waf-block "request"  if is_deny
+    http-request deny deny_status 403 hdr waf-block "request" if is_deny
     http-response deny deny_status 403 hdr waf-block "response" if is_deny
-
+    
     http-request silent-drop if { var(txn.e2e.action) -m str drop }
     http-response silent-drop if { var(txn.e2e.action) -m str drop }
 
@@ -127,11 +186,11 @@ spoe-agent e2e
     log         global
 
 spoe-message coraza-req
-    args app=str(default) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body
+    args app=str(default) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body exportRuleIDs=bool(true)
     event on-frontend-http-request
 
 spoe-message coraza-res
-    args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body
+    args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body exportRuleIDs=bool(true)
     event on-http-response
 `,
 		BackendConfig: fmt.Sprintf(`

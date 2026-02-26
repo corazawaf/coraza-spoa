@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"math/rand"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 	"github.com/jcchavezs/mergefs"
@@ -43,17 +45,18 @@ type transaction struct {
 }
 
 type applicationRequest struct {
-	SrcIp   netip.Addr
-	SrcPort int64
-	DstIp   netip.Addr
-	DstPort int64
-	Method  string
-	ID      string
-	Path    []byte
-	Query   []byte
-	Version string
-	Headers []byte
-	Body    []byte
+	SrcIp         netip.Addr
+	SrcPort       int64
+	DstIp         netip.Addr
+	DstPort       int64
+	Method        string
+	ID            string
+	Path          []byte
+	Query         []byte
+	Version       string
+	Headers       []byte
+	Body          []byte
+	ExportRuleIDs bool
 }
 
 func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
@@ -125,6 +128,8 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 			k = encoding.AcquireKVEntry()
 		case "id":
 			req.ID = string(k.ValueBytes())
+		case "exportRuleIDs":
+			req.ExportRuleIDs = k.ValueBool()
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
@@ -154,9 +159,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		}
 	}()
 
-	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
-	}()
+	defer exportWAFMetrics(writer, tx, req.ExportRuleIDs)
 
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
@@ -231,11 +234,12 @@ func readHeaders(headers []byte, hdrCallback func(key string, value string), hos
 }
 
 type applicationResponse struct {
-	ID      string
-	Version string
-	Status  int64
-	Headers []byte
-	Body    []byte
+	ID            string
+	Version       string
+	Status        int64
+	Headers       []byte
+	Body          []byte
+	ExportRuleIDs bool
 }
 
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
@@ -280,6 +284,8 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			res.Body = currK.ValueBytes()
 			// acquire a new kv entry to continue reading other message values.
 			k = encoding.AcquireKVEntry()
+		case "exportRuleIDs":
+			res.ExportRuleIDs = k.ValueBool()
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
@@ -308,9 +314,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		}
 	}()
 
-	defer func() {
-		_ = writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", countRulesHit(tx.MatchedRules()))
-	}()
+	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs)
 
 	if tx.IsRuleEngineOff() {
 		goto exit
@@ -483,12 +487,63 @@ func (e ErrInterrupted) Is(target error) bool {
 	return e.Interruption == t.Interruption
 }
 
-func countRulesHit(rules []types.MatchedRule) int64 {
+// The CRS ranges logic is copied from go-ftw (https://github.com/coreruleset/go-ftw).
+func isAttackRule(ruleID int) bool {
+	// Standard CRS Attack Ranges (from go-ftw)
+	isFTWAttack := (ruleID >= 910000 && ruleID < 950000) || (ruleID >= 950000 && ruleID < 960000)
+
+	// Custom Local Attack Ranges (e.g., local hardening rules)
+	isCustomAttack := ruleID >= 190000 && ruleID < 200000
+
+	return isFTWAttack || isCustomAttack
+}
+
+func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, exportRuleIDs bool) error {
+	matchedRules := tx.MatchedRules()
+	var ids []string
+	if exportRuleIDs {
+		ids = make([]string, 0, len(matchedRules))
+	}
 	var count int64
-	for _, mr := range rules {
-		if mr.Message() != "" {
-			count++
+	for _, mr := range matchedRules {
+		// Ignore rules without a message (silent control flow rules)
+		if mr.Message() == "" {
+			continue
+		}
+		// Only include actual attack rules within the CRS range
+		if !isAttackRule(mr.Rule().ID()) {
+			continue
+		}
+
+		if exportRuleIDs {
+			ids = append(ids, strconv.Itoa(mr.Rule().ID()))
+		}
+		count++
+	}
+	if err := writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count); err != nil {
+		return err
+	}
+
+	if txState, ok := tx.(plugintypes.TransactionState); ok {
+		scores := txState.Variables().TX().Get("blocking_inbound_anomaly_score")
+		var score int64
+		if len(scores) != 0 {
+			v, err := strconv.ParseInt(scores[0], 10, 64)
+			if err != nil {
+				return err
+			}
+			score = v
+		}
+		if err := writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", score); err != nil {
+			return err
+		}
+
+		if exportRuleIDs {
+			if err := writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ",")); err != nil {
+				return err
+			}
 		}
 	}
-	return count
+
+	return nil
 }

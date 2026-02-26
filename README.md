@@ -70,6 +70,58 @@ Because, in the SPOE configuration file (coraza.cfg), we declare to use the back
 
 If you intend to access coraza-spoa service from another machine, remember to change the binding networking directives (IPAddressAllow/IPAddressDeny) in [contrib/coraza-spoa.service](https://github.com/corazawaf/coraza-spoa/blob/main/contrib/coraza-spoa.service)
 
+## HAProxy Logging
+
+To gain full visibility into WAF actions directly from your HAProxy logs, you can use the transaction variables exported by the Coraza-SPOA agent.
+
+### Available Variables
+
+The agent populates the following variables in the `txn` scope:
+
+* **`txn.coraza.id`**: The unique transaction ID.
+* **`txn.coraza.status`**: The HTTP status code determined by the WAF (e.g., 403).
+* **`txn.coraza.anomaly_score`**: The total inbound anomaly score for the request.
+* **`txn.coraza.rules_hit`**: The total count of triggered attack rules.
+* **`txn.coraza.rule_ids`**: A comma-separated list of triggered Rule IDs (if enabled).
+* **`txn.coraza.error`**: Contains SPOA-related errors if the transaction fails.
+
+### Example Log Formats
+
+You can incorporate these variables into your `log-format` directive in `haproxy.cfg`.
+
+**1. Standard Score Tracking**
+Use this for general monitoring of threat levels and rule counts:
+
+```haproxy
+log-format "%ci:%cp\ [%t]\ %ft\ %b/%s\ %Th/%Ti/%TR/%Tq/%Tw/%Tc/%Tr/%Tt\ %ST\ %B\ %CC\ %CS\ %tsc\ %ac/%fc/%bc/%sc/%rc\ %sq/%bq\ %hr\ %hs\ %{+Q}r\ %[var(txn.coraza.id)]\ spoa-error:\ %[var(txn.coraza.error)]\ waf-hit:\ %[var(txn.coraza.status)]\ score:%[var(txn.coraza.anomaly_score)]\ rules_hit:%[var(txn.coraza.rules_hit)]"
+```
+
+**2. Extended Debugging (with Rule IDs)**
+Use this if you need to identify exactly which rules were triggered to troubleshoot false positives. 
+
+> **Note:** Exporting the specific Rule IDs requires explicit activation in your Coraza configuration.
+```coraza.cfg
+spoe-message coraza-req
+    
+    args app= ... exportRuleIDs=bool(true)
+
+spoe-message coraza-res
+    
+    args app= ... exportRuleIDs=bool(true)
+
+  .....
+```
+```haproxy
+log-format "%ci:%cp\ [%t]\ %ft\ %b/%s\ %Th/%Ti/%TR/%Tq/%Tw/%Tc/%Tr/%Tt\ %ST\ %B\ %CC\ %CS\ %tsc\ %ac/%fc/%bc/%sc/%rc\ %sq/%bq\ %hr\ %hs\ %{+Q}r\ %[var(txn.coraza.id)]\ spoa-error:\ %[var(txn.coraza.error)]\ waf-hit:\ %[var(txn.coraza.status)]\ rule_ids:\ %[var(txn.coraza.rule_ids)]\ rules-hit:\ %[var(txn.coraza.rules_hit)]"
+```
+
+### Custom Rules & ID Ranges Allocation
+
+To avoid conflicts with the OWASP Core Rule Set (CRS) and to ensure that the SPOA agent exports accurate metrics to HAProxy (`rules_hit` & `rule_ids`), you must strictly adhere to the following Rule ID ranges for local rules:
+
+* **Infrastructure & Whitelists (IDs: 100000 - 189999):** Use this range for IP whitelists, disabling specific CRS rules, or tuning (e.g., GeoIP limits). Rules in this range are **intentionally ignored** by the SPOA agent's attack counter to prevent false positives in your HAProxy metrics.
+* **Custom Attack & Hardening Rules (IDs: 190000 - 199999):** Use this range for actual security blocks and custom hardening rules. Rules in this range are actively monitored. If triggered, they will increment the `rules_hit` counter and their IDs will be exported in the `rule_ids` variable.
+
 ## Docker
 
 - Build the coraza-spoa image `cd ./example ; docker compose build`
