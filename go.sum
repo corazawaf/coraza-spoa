@@ -43,6 +43,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mccutchen/go-httpbin/v2 v2.20.0 h1:iMUzhdbAcjo9hepfG5W3hz1yWAyxiYlJMzKQtwyGDms=
 github.com/mccutchen/go-httpbin/v2 v2.20.0/go.mod h1:GBy5I7XwZ4ZLhT3hcq39I4ikwN9x4QUt6EAxNiR8Jus=
+github.com/mccutchen/go-httpbin/v2 v2.21.0 h1:0xs/5eCHihKtS6O8DRaioU2HXCyF/y+63PPFiXgOpTs=
+github.com/mccutchen/go-httpbin/v2 v2.21.0/go.mod h1:8hkN5rHf0QvJYEovZ8u/Dudtqyj6Z5gxQaW7scQfT0Y=
 github.com/miekg/dns v1.1.58 h1:ca2Hdkz+cDg/7eNF6V56jjzuZ4aCAE+DbVkILdQWG/4=
 github.com/miekg/dns v1.1.58/go.mod h1:Ypv+3b/KadlvW9vJfXOTf300O4UqaHFzFCuHz+rPkBY=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
