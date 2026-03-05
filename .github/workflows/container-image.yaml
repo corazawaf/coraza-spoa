@@ -28,11 +28,11 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1ea3db7bfb6d247e5e3511955d6e476a8d400ef3 # docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # docker/setup-qemu-action@v3
 
        # https://github.com/docker/setup-buildx-action
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@9cd4410b76a77e8054419e70095df406556617a8 # docker/setup-buildx-action@v3.11.1
+        uses: docker/setup-buildx-action@28a438e9ed9ef7ae2ebd0bf839039005c9501312 # docker/setup-buildx-action@v3.11.1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
