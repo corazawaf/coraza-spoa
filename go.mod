@@ -3,7 +3,7 @@ module github.com/corazawaf/coraza-spoa
 go 1.25.7
 
 require (
-	github.com/corazawaf/coraza-coreruleset/v4 v4.23.0
+	github.com/corazawaf/coraza-coreruleset/v4 v4.24.0
 	github.com/corazawaf/coraza/v3 v3.3.3
 	github.com/dropmorepackets/haproxy-go v0.0.8
 	github.com/fsnotify/fsnotify v1.9.0
