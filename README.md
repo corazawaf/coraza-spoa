@@ -16,6 +16,21 @@ HAProxy includes a [Stream Processing Offload Engine](https://www.haproxy.com/bl
 
 The command `go run mage.go build` will compile the source code and produce the executable file `coraza-spoa` inside the `build/` folder.
 
+## Command Line Options
+
+The `coraza-spoa` binary supports the following command-line flags:
+
+| Flag | Description |
+|---|---|
+| `-config` | Path to the configuration file (required unless -version is used). |
+| `-bind` | Override the bind address defined in the configuration file (e.g., `0.0.0.0:9000`). |
+| `-validate` | Validate the configuration file and exit. |
+| `-autoreload` | Enable automatic configuration reload (useful for Kubernetes ConfigMaps). |
+| `-metrics-addr` | Address to bind for Prometheus metrics (e.g., `:8080`). |
+| `-version` | Show version information and exit. |
+| `-cpuprofile` | Write CPU profile to the specified file (for debugging). |
+| `-memprofile` | Write memory profile to the specified file (for debugging). |
+
 ## Configuration
 
 ## Coraza SPOA
