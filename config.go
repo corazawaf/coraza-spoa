@@ -30,6 +30,10 @@ func readConfig() (*config, error) {
 		return nil, err
 	}
 
+	if bindAddr != "" {
+		cfg.Bind = bindAddr
+	}
+
 	if len(cfg.Applications) == 0 {
 		globalLogger.Warn().Msg("no applications defined")
 	}
@@ -187,22 +191,22 @@ type logConfig struct {
 func (lc logConfig) outputWriter() (io.Writer, error) {
 	var out io.Writer
 	switch lc.File {
-		case "":
-			fallthrough
-		case "/dev/stdout":
-			out = os.Stdout
-		case "/dev/stderr":
-			out = os.Stderr
-		case "/dev/null":
-			out = io.Discard
-		default:
-			// TODO: Close the handle if not used anymore.
-			// Currently these are leaked as soon as we reload.
-			f, err := os.OpenFile(lc.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-			if err != nil {
-				return nil, err
-			}
-			out = f
+	case "":
+		fallthrough
+	case "/dev/stdout":
+		out = os.Stdout
+	case "/dev/stderr":
+		out = os.Stderr
+	case "/dev/null":
+		out = io.Discard
+	default:
+		// TODO: Close the handle if not used anymore.
+		// Currently these are leaked as soon as we reload.
+		f, err := os.OpenFile(lc.File, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			return nil, err
+		}
+		out = f
 	}
 	return out, nil
 }

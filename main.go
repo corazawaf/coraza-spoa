@@ -28,6 +28,7 @@ var (
 
 var (
 	configPath     string
+	bindAddr       string
 	validateConfig bool
 	autoReload     bool
 	cpuProfile     string
@@ -39,6 +40,7 @@ var (
 
 func main() {
 	flag.StringVar(&configPath, "config", "", "configuration file")
+	flag.StringVar(&bindAddr, "bind", "", "bind address")
 	flag.BoolVar(&validateConfig, "validate", false, "validate configuration file and exit")
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
