@@ -23,7 +23,7 @@ The `coraza-spoa` binary supports the following command-line flags:
 | Flag | Description |
 |---|---|
 | `-config` | Path to the configuration file (required unless -version is used). |
-| `-bind` | Override the bind address defined in the configuration file (e.g., `0.0.0.0:9000`). |
+| `-bind` | Override the bind address defined in the configuration file (e.g., `127.0.0.1:9000`). |
 | `-validate` | Validate the configuration file and exit. |
 | `-autoreload` | Enable automatic configuration reload (useful for Kubernetes ConfigMaps). |
 | `-metrics-addr` | Address to bind for Prometheus metrics (e.g., `:8080`). |
