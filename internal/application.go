@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"runtime/debug"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -33,8 +34,9 @@ type AppConfig struct {
 }
 
 type Application struct {
-	waf   coraza.WAF
-	cache cache.ExpiringCache
+	waf     coraza.WAF
+	cache   cache.ExpiringCache
+	asyncWg sync.WaitGroup
 
 	AppConfig
 }
@@ -240,6 +242,7 @@ type applicationResponse struct {
 	Headers       []byte
 	Body          []byte
 	ExportRuleIDs bool
+	DetectOnly    bool
 }
 
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
@@ -286,6 +289,8 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			k = encoding.AcquireKVEntry()
 		case "exportRuleIDs":
 			res.ExportRuleIDs = k.ValueBool()
+		case "detect-only":
+			res.DetectOnly = k.ValueBool()
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
@@ -306,6 +311,11 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		return fmt.Errorf("transaction is already being deleted: %s", res.ID)
 	}
 	tx := t.tx
+
+	// Detection-only mode: return immediately, evaluate in background.
+	if res.DetectOnly {
+		return a.handleResponseDetectOnly(res, tx)
+	}
 
 	defer func() {
 		tx.ProcessLogging()
@@ -344,6 +354,83 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 
 exit:
 	return nil
+}
+
+// handleResponseDetectOnly returns immediately to HAProxy and evaluates
+// WAF rules in a background goroutine for logging purposes only.
+func (a *Application) handleResponseDetectOnly(res applicationResponse, tx types.Transaction) error {
+	// Deep copy borrowed byte slices before the SPOE frame is reused.
+	// String fields (Version, ID) and int fields (Status) are already
+	// Go values and safe to use in the goroutine without copying.
+	headers := make([]byte, len(res.Headers))
+	copy(headers, res.Headers)
+	body := make([]byte, len(res.Body))
+	copy(body, res.Body)
+
+	a.asyncWg.Add(1)
+	go func() {
+		defer a.asyncWg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				a.Logger.Error().
+					Str("tx", tx.ID()).
+					Interface("panic", r).
+					Bytes("stack", debug.Stack()).
+					Msg("detect-only: panic in background evaluation")
+			}
+		}()
+		a.evaluateResponse(tx, res.Status, res.Version, headers, body)
+	}()
+
+	return nil
+}
+
+// DrainDetectOnly blocks until all in-flight detect-only evaluations complete.
+func (a *Application) DrainDetectOnly() {
+	a.asyncWg.Wait()
+}
+
+// evaluateResponse processes response headers and body through WAF rules,
+// logging all matches. Used by detect-only mode for background evaluation.
+func (a *Application) evaluateResponse(tx types.Transaction, status int64, version string, headers, body []byte) {
+	defer func() {
+		tx.ProcessLogging()
+		if err := tx.Close(); err != nil {
+			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
+		}
+	}()
+
+	if tx.IsRuleEngineOff() {
+		return
+	}
+
+	if err := readHeaders(headers, tx.AddResponseHeader, nil); err != nil {
+		a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("detect-only: reading headers")
+		return
+	}
+
+	if it := tx.ProcessResponseHeaders(int(status), "HTTP/"+version); it != nil {
+		a.Logger.Warn().
+			Str("tx", tx.ID()).
+			Int("rule_id", it.RuleID).
+			Str("action", it.Action).
+			Msg("detect-only: response headers would have been interrupted")
+	}
+
+	if _, _, err := tx.WriteResponseBody(body); err != nil {
+		a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("detect-only: writing response body")
+		return
+	}
+
+	if it, err := tx.ProcessResponseBody(); err != nil {
+		a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("detect-only: processing response body")
+	} else if it != nil {
+		a.Logger.Warn().
+			Str("tx", tx.ID()).
+			Int("rule_id", it.RuleID).
+			Str("action", it.Action).
+			Msg("detect-only: response body would have been interrupted")
+	}
 }
 
 func (a AppConfig) NewApplication() (*Application, error) {
