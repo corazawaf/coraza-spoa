@@ -358,6 +358,12 @@ exit:
 
 // handleResponseDetectOnly returns immediately to HAProxy and evaluates
 // WAF rules in a background goroutine for logging purposes only.
+//
+// A separate goroutine is required because the SPOP protocol is strictly
+// request-response: once HandleSPOE returns, the SPOP library sends the
+// response frame to HAProxy. There is no post-processing hook or
+// fire-and-forget mode in the SPOP library, so any work after the
+// response must happen outside the handler's lifecycle.
 func (a *Application) handleResponseDetectOnly(res applicationResponse, tx types.Transaction) error {
 	// Deep copy borrowed byte slices before the SPOE frame is reused.
 	// String fields (Version, ID) and int fields (Status) are already
