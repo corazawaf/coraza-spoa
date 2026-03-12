@@ -62,6 +62,38 @@ Include @crs-setup.conf.example
 Include @owasp_crs/*.conf
 SecRuleEngine On
 `
+	t.Run("detect-only", func(t *testing.T) {
+		config, _, _ := runCorazaDetectOnly(t, defaultCorazaConfig)
+
+		t.Run("clean request passes", func(t *testing.T) {
+			// We have to access via localhost to prevent 920350 matching.
+			req, _ := http.NewRequest("GET", "http://localhost:"+config.FrontendPort+"/", http.NoBody)
+			req.Header.Set("coraza-e2e", "ok")
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusOK, resp.StatusCode)
+			}
+		})
+
+		t.Run("request phase still blocks", func(t *testing.T) {
+			req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/anything?arg=<script>alert(0)</script>", http.NoBody)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusForbidden {
+				t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusForbidden, resp.StatusCode)
+			}
+		})
+	})
+
 	t.Run("default config", func(t *testing.T) {
 		config, _, _ := runCoraza(t, defaultCorazaConfig)
 
@@ -112,7 +144,7 @@ SecRuleEngine On
 
 }
 
-func runCoraza(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
+func setupCorazaAgent(tb testing.TB, directives string) (*Agent, string, string) {
 	s := httptest.NewServer(httpbin.New())
 	tb.Cleanup(s.Close)
 
@@ -130,7 +162,7 @@ func runCoraza(tb testing.TB, directives string) (testutil.HAProxyConfig, string
 		tb.Fatal(err)
 	}
 
-	a := Agent{
+	a := &Agent{
 		Context:            context.Background(),
 		DefaultApplication: application,
 		Applications: map[string]*Application{
@@ -138,6 +170,12 @@ func runCoraza(tb testing.TB, directives string) (testutil.HAProxyConfig, string
 		},
 		Logger: logger,
 	}
+
+	return a, s.URL, s.Listener.Addr().String()
+}
+
+func runCoraza(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
+	a, binURL, backendAddr := setupCorazaAgent(tb, directives)
 
 	// create the listener synchronously to prevent a race
 	l := testutil.TCPListener(tb)
@@ -165,7 +203,7 @@ func runCoraza(tb testing.TB, directives string) (testutil.HAProxyConfig, string
 
     http-request deny deny_status 403 hdr waf-block "request" if is_deny
     http-response deny deny_status 403 hdr waf-block "response" if is_deny
-    
+
     http-request silent-drop if { var(txn.e2e.action) -m str drop }
     http-response silent-drop if { var(txn.e2e.action) -m str drop }
 
@@ -196,10 +234,78 @@ spoe-message coraza-res
 		BackendConfig: fmt.Sprintf(`
 mode http
 server httpbin %s
-`, s.Listener.Addr().String()),
+`, backendAddr),
 	}
 
 	frontendSocket := cfg.Run(tb)
 
-	return cfg, s.URL, frontendSocket
+	return cfg, binURL, frontendSocket
+}
+
+func runCorazaDetectOnly(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
+	a, binURL, backendAddr := setupCorazaAgent(tb, directives)
+
+	// create the listener synchronously to prevent a race
+	l := testutil.TCPListener(tb)
+	// ignore errors as the listener will be closed by t.Cleanup
+	go a.Serve(l)
+
+	cfg := testutil.HAProxyConfig{
+		EngineAddr:   l.Addr().String(),
+		FrontendPort: fmt.Sprintf("%d", testutil.TCPPort(tb)),
+		CustomFrontendConfig: `
+    # Currently haproxy cannot use variables to set the code or deny_status, so this needs to be manually configured here
+    http-request redirect code 302 location %[var(txn.e2e.data)] if { var(txn.e2e.action) -m str redirect }
+    http-response redirect code 302 location %[var(txn.e2e.data)] if { var(txn.e2e.action) -m str redirect }
+
+    acl is_deny var(txn.e2e.action) -m str deny
+    acl status_424 var(txn.e2e.status) -m int 424
+
+    http-after-response set-header X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]"
+    http-after-response set-header X-Rules-Hit "%[var(txn.e2e.rules_hit)]"
+    http-after-response set-header X-Rule-IDs "%[var(txn.e2e.rule_ids)]"
+
+    # Special check for e2e tests as they validate the config.
+    http-request deny deny_status 424 hdr waf-block "request" if is_deny status_424
+    http-response deny deny_status 424 hdr waf-block "response" if is_deny status_424
+
+    http-request deny deny_status 403 hdr waf-block "request" if is_deny
+    http-response deny deny_status 403 hdr waf-block "response" if is_deny
+
+    http-request silent-drop if { var(txn.e2e.action) -m str drop }
+    http-response silent-drop if { var(txn.e2e.action) -m str drop }
+
+    # Deny in case of an error, when processing with the Coraza SPOA
+    http-request deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
+    http-response deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
+`,
+		EngineConfig: `
+[e2e]
+spoe-agent e2e
+    messages    coraza-req     coraza-res
+    option      var-prefix      e2e
+    option      set-on-error    error
+    timeout     hello           2s
+    timeout     idle            2m
+    timeout     processing      500ms
+    use-backend e2e-spoa
+    log         global
+
+spoe-message coraza-req
+    args app=str(default) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body exportRuleIDs=bool(true)
+    event on-frontend-http-request
+
+spoe-message coraza-res
+    args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body exportRuleIDs=bool(true) detect-only=bool(true)
+    event on-http-response
+`,
+		BackendConfig: fmt.Sprintf(`
+mode http
+server httpbin %s
+`, backendAddr),
+	}
+
+	frontendSocket := cfg.Run(tb)
+
+	return cfg, binURL, frontendSocket
 }
