@@ -157,6 +157,11 @@ outer:
 		}
 	}
 
+	// Drain in-flight detect-only background evaluations before exit.
+	for _, app := range apps {
+		app.DrainDetectOnly()
+	}
+
 	if memProfile != "" {
 		f, err := os.Create(memProfile)
 		if err != nil {
