@@ -15,7 +15,10 @@ on:
       - example/Dockerfile
       - example/coraza-spoa.yaml
   pull_request:
+    branches: [main]
   workflow_dispatch:
+
+permissions: {}
 
 jobs:
   build:

@@ -8,8 +8,12 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions: {}
+
 jobs:
   build:
+    permissions:
+      contents: read
     strategy:
       matrix:
         arch: [ amd64, arm64 ]

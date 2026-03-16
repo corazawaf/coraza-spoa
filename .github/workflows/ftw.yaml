@@ -4,10 +4,15 @@ name: FTW Test
 
 on:
   pull_request:
+    branches: [main]
   push:
+
+permissions: {}
 
 jobs:
   test:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
