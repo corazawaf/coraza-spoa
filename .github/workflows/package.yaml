@@ -74,7 +74,7 @@ jobs:
       ## Publish to the "testing" repo
       - name: Cloudsmith Push:debian/coraza-spoa-snapshots
         if: ${{ github.ref_type == 'branch' && github.ref_name == 'main' }}
-        uses: cloudsmith-io/action@master
+        uses: cloudsmith-io/action@0ce83a3f1c773732df56cb025692c3fee5af9a41 # master
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
@@ -88,7 +88,7 @@ jobs:
       ## Publish tags to the "main" repo
       - name: Cloudsmith Push:debian/coraza-spoa
         if: ${{ github.ref_type == 'tag' }}
-        uses: cloudsmith-io/action@master
+        uses: cloudsmith-io/action@0ce83a3f1c773732df56cb025692c3fee5af9a41 # master
         with:
           api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           command: "push"
