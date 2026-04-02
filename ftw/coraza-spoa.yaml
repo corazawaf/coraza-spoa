@@ -47,6 +47,9 @@ applications:
 
     response_check: true
     transaction_ttl_ms: 60000
-    log_level: error  # Printing only logs at error level to reduce what ftw has to parse
+    # Log level must be "info" or lower for ftw to read WARNING/NOTICE level
+    # rule matches. The coraza-spoa writes matched rules to ftw.log which is
+    # then parsed by ftw to verify expected rule IDs.
+    log_level: info
     log_file: /build/ftw.log
     log_format: console
