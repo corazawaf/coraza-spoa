@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.1](https://github.com/corazawaf/coraza-spoa/compare/v0.6.0...v0.6.1) (2026-04-02)
+
+
+### Bug Fixes
+
+* **deps:** update all non-major dependencies in .github/workflows/test.yaml ([f90e4bb](https://github.com/corazawaf/coraza-spoa/commit/f90e4bb9f2ca3f31c50211591cb510effe0c2e7c))
+* **ftw:** add explanations for all ignored FTW tests ([9cd245c](https://github.com/corazawaf/coraza-spoa/commit/9cd245c43f30d5e9e00fa87d3738943028e122f2))
+* **ftw:** set log level to info so WARNING/NOTICE rule matches are visible ([517e378](https://github.com/corazawaf/coraza-spoa/commit/517e37877c52f13c8601157b359cb1012fc29f7f))
+
 ## [0.6.0](https://github.com/corazawaf/coraza-spoa/compare/v0.5.1...v0.6.0) (2026-03-01)
 
 
