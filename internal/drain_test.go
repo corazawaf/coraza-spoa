@@ -174,5 +174,8 @@ func TestDrainDetectOnly_ConcurrentRace(t *testing.T) {
 
 	// After drain, all work (async or sync fallback) must be complete.
 	// If the race existed, the -race detector would flag it here.
+	if asyncCount.Load() == 0 {
+		t.Fatal("no workers completed — test did not exercise any work")
+	}
 	t.Logf("completed requests: %d", asyncCount.Load())
 }
