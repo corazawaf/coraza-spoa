@@ -251,12 +251,20 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}
 
 	k := encoding.AcquireKVEntry()
-	// run defer via anonymous function to not directly evaluate the arguments.
 	defer func() {
 		encoding.ReleaseKVEntry(k)
 	}()
 
 	var res applicationResponse
+	// borrowed tracks KV entries whose byte slices are referenced by res.
+	// Released when the function returns (or transferred to the goroutine
+	// in detect-only mode).
+	var borrowed []*encoding.KVEntry
+	defer func() {
+		for _, entry := range borrowed {
+			encoding.ReleaseKVEntry(entry)
+		}
+	}()
 	for message.KV.Next(k) {
 		switch name := string(k.NameBytes()); name {
 		case "id":
@@ -266,26 +274,14 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		case "status":
 			res.Status = k.ValueInt()
 		case "headers":
-			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			// run defer via anonymous function to not directly evaluate the arguments.
-			defer func() {
-				encoding.ReleaseKVEntry(currK)
-			}()
-
+			borrowed = append(borrowed, currK)
 			res.Headers = currK.ValueBytes()
-			// acquire a new kv entry to continue reading other message values.
 			k = encoding.AcquireKVEntry()
 		case "body":
-			// make a copy of the pointer and add a defer in case there is another entry
 			currK := k
-			// run defer via anonymous function to not directly evaluate the arguments.
-			defer func() {
-				encoding.ReleaseKVEntry(currK)
-			}()
-
+			borrowed = append(borrowed, currK)
 			res.Body = currK.ValueBytes()
-			// acquire a new kv entry to continue reading other message values.
 			k = encoding.AcquireKVEntry()
 		case "exportRuleIDs":
 			res.ExportRuleIDs = k.ValueBool()
@@ -312,131 +308,80 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}
 	tx := t.tx
 
-	// Detection-only mode: return immediately, evaluate in background.
-	if res.DetectOnly {
-		return a.handleResponseDetectOnly(res, tx)
+	process := func(headers, body []byte) error {
+		if tx.IsRuleEngineOff() {
+			return nil
+		}
+
+		if err := readHeaders(headers, tx.AddResponseHeader, nil); err != nil {
+			return fmt.Errorf("reading headers: %v", err)
+		}
+
+		if it := tx.ProcessResponseHeaders(int(res.Status), "HTTP/"+res.Version); it != nil {
+			return ErrInterrupted{it}
+		}
+
+		switch it, _, err := tx.WriteResponseBody(body); {
+		case err != nil:
+			return err
+		case it != nil:
+			return ErrInterrupted{it}
+		}
+
+		switch it, err := tx.ProcessResponseBody(); {
+		case err != nil:
+			return err
+		case it != nil:
+			return ErrInterrupted{it}
+		}
+
+		return nil
 	}
 
-	defer func() {
+	closeTx := func() {
 		tx.ProcessLogging()
 		if err := tx.Close(); err != nil {
 			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
 		}
-	}()
-
-	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs)
-
-	if tx.IsRuleEngineOff() {
-		goto exit
 	}
 
-	if err := readHeaders(res.Headers, tx.AddResponseHeader, nil); err != nil {
-		return fmt.Errorf("reading headers: %v", err)
-	}
+	// Detection-only mode: deep copy borrowed byte slices (the SPOE frame
+	// buffer is reused after HandleSPOE returns) and evaluate in background.
+	if res.DetectOnly {
+		headers := make([]byte, len(res.Headers))
+		copy(headers, res.Headers)
+		body := make([]byte, len(res.Body))
+		copy(body, res.Body)
 
-	if it := tx.ProcessResponseHeaders(int(res.Status), "HTTP/"+res.Version); it != nil {
-		return ErrInterrupted{it}
-	}
+		a.asyncWg.Add(1)
+		go func() {
+			defer a.asyncWg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					a.Logger.Error().
+						Str("tx", tx.ID()).
+						Interface("panic", r).
+						Bytes("stack", debug.Stack()).
+						Msg("detect-only: panic in background evaluation")
+				}
+			}()
+			defer closeTx()
 
-	switch it, _, err := tx.WriteResponseBody(res.Body); {
-	case err != nil:
-		return err
-	case it != nil:
-		return ErrInterrupted{it}
-	}
-
-	switch it, err := tx.ProcessResponseBody(); {
-	case err != nil:
-		return err
-	case it != nil:
-		return ErrInterrupted{it}
-	}
-
-exit:
-	return nil
-}
-
-// handleResponseDetectOnly returns immediately to HAProxy and evaluates
-// WAF rules in a background goroutine for logging purposes only.
-//
-// A separate goroutine is required because the SPOP protocol is strictly
-// request-response: once HandleSPOE returns, the SPOP library sends the
-// response frame to HAProxy. There is no post-processing hook or
-// fire-and-forget mode in the SPOP library, so any work after the
-// response must happen outside the handler's lifecycle.
-func (a *Application) handleResponseDetectOnly(res applicationResponse, tx types.Transaction) error {
-	// Deep copy borrowed byte slices before the SPOE frame is reused.
-	// String fields (Version, ID) and int fields (Status) are already
-	// Go values and safe to use in the goroutine without copying.
-	headers := make([]byte, len(res.Headers))
-	copy(headers, res.Headers)
-	body := make([]byte, len(res.Body))
-	copy(body, res.Body)
-
-	a.asyncWg.Add(1)
-	go func() {
-		defer a.asyncWg.Done()
-		defer func() {
-			if r := recover(); r != nil {
-				a.Logger.Error().
-					Str("tx", tx.ID()).
-					Interface("panic", r).
-					Bytes("stack", debug.Stack()).
-					Msg("detect-only: panic in background evaluation")
+			if err := process(headers, body); err != nil {
+				a.Logger.Debug().Str("tx", tx.ID()).Err(err).Msg("detect-only: evaluation error")
 			}
 		}()
-		a.evaluateResponse(tx, res.Status, res.Version, headers, body)
-	}()
+		return nil
+	}
 
-	return nil
+	defer closeTx()
+	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs)
+	return process(res.Headers, res.Body)
 }
 
 // DrainDetectOnly blocks until all in-flight detect-only evaluations complete.
 func (a *Application) DrainDetectOnly() {
 	a.asyncWg.Wait()
-}
-
-// evaluateResponse processes response headers and body through WAF rules,
-// logging all matches. Used by detect-only mode for background evaluation.
-func (a *Application) evaluateResponse(tx types.Transaction, status int64, version string, headers, body []byte) {
-	defer func() {
-		tx.ProcessLogging()
-		if err := tx.Close(); err != nil {
-			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
-		}
-	}()
-
-	if tx.IsRuleEngineOff() {
-		return
-	}
-
-	if err := readHeaders(headers, tx.AddResponseHeader, nil); err != nil {
-		a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("detect-only: reading headers")
-		return
-	}
-
-	if it := tx.ProcessResponseHeaders(int(status), "HTTP/"+version); it != nil {
-		a.Logger.Warn().
-			Str("tx", tx.ID()).
-			Int("rule_id", it.RuleID).
-			Str("action", it.Action).
-			Msg("detect-only: response headers would have been interrupted")
-	}
-
-	if _, _, err := tx.WriteResponseBody(body); err != nil {
-		a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("detect-only: writing response body")
-		return
-	}
-
-	if it, err := tx.ProcessResponseBody(); err != nil {
-		a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("detect-only: processing response body")
-	} else if it != nil {
-		a.Logger.Warn().
-			Str("tx", tx.ID()).
-			Int("rule_id", it.RuleID).
-			Str("action", it.Action).
-			Msg("detect-only: response body would have been interrupted")
-	}
 }
 
 func (a AppConfig) NewApplication() (*Application, error) {
