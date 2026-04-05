@@ -37,6 +37,8 @@ type Application struct {
 	waf     coraza.WAF
 	cache   cache.ExpiringCache
 	asyncWg sync.WaitGroup
+	asyncMu sync.Mutex
+	draining bool
 
 	AppConfig
 }
@@ -348,12 +350,21 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	// Detection-only mode: deep copy borrowed byte slices (the SPOE frame
 	// buffer is reused after HandleSPOE returns) and evaluate in background.
 	if res.DetectOnly {
+		a.asyncMu.Lock()
+		if a.draining {
+			a.asyncMu.Unlock()
+			// Shutdown in progress; fall back to synchronous evaluation.
+			defer closeTx()
+			return process(res.Headers, res.Body)
+		}
+		a.asyncWg.Add(1)
+		a.asyncMu.Unlock()
+
 		headers := make([]byte, len(res.Headers))
 		copy(headers, res.Headers)
 		body := make([]byte, len(res.Body))
 		copy(body, res.Body)
 
-		a.asyncWg.Add(1)
 		go func() {
 			defer a.asyncWg.Done()
 			defer func() {
@@ -379,8 +390,12 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	return process(res.Headers, res.Body)
 }
 
-// DrainDetectOnly blocks until all in-flight detect-only evaluations complete.
+// DrainDetectOnly sets the draining flag to refuse new background work
+// and blocks until all in-flight detect-only evaluations complete.
 func (a *Application) DrainDetectOnly() {
+	a.asyncMu.Lock()
+	a.draining = true
+	a.asyncMu.Unlock()
 	a.asyncWg.Wait()
 }
 

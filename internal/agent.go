@@ -36,6 +36,28 @@ func (a *Agent) ReplaceApplications(newApps map[string]*Application) {
 	a.mtx.Unlock()
 }
 
+// DrainDetectOnly blocks until all in-flight detect-only evaluations
+// complete across all current applications.
+func (a *Agent) DrainDetectOnly() {
+	a.mtx.RLock()
+	defer a.mtx.RUnlock()
+	seen := make(map[*Application]struct{}, len(a.Applications)+1)
+	for _, app := range a.Applications {
+		if _, ok := seen[app]; ok {
+			continue
+		}
+		seen[app] = struct{}{}
+		app.DrainDetectOnly()
+	}
+	// DefaultApplication is expected to be in Applications, but drain
+	// it explicitly in case the invariant changes in the future.
+	if a.DefaultApplication != nil {
+		if _, ok := seen[a.DefaultApplication]; !ok {
+			a.DefaultApplication.DrainDetectOnly()
+		}
+	}
+}
+
 func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) {
 	timer := prometheus.NewTimer(handleSPOEDuration)
 	defer timer.ObserveDuration()

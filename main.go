@@ -157,10 +157,11 @@ outer:
 		}
 	}
 
+	// Stop accepting new connections before draining background work.
+	cancelFunc()
+
 	// Drain in-flight detect-only background evaluations before exit.
-	for _, app := range apps {
-		app.DrainDetectOnly()
-	}
+	a.DrainDetectOnly()
 
 	if memProfile != "" {
 		f, err := os.Create(memProfile)
