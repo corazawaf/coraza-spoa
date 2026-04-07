@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/corazawaf/coraza-spoa/compare/v0.6.1...v0.7.0) (2026-04-07)
+
+
+### Features
+
+* add detect-only mode for response evaluation ([1770948](https://github.com/corazawaf/coraza-spoa/commit/1770948fd80cea3e9cb4c2bcf18644032267b2ce))
+
+
+### Bug Fixes
+
+* prevent race between detect-only goroutines and DrainDetectOnly ([31434db](https://github.com/corazawaf/coraza-spoa/commit/31434dbdcdd2e9e25647c8c717463d1b84e0eae9))
+
 ## [0.6.1](https://github.com/corazawaf/coraza-spoa/compare/v0.6.0...v0.6.1) (2026-04-02)
 
 
