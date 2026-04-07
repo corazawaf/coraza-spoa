@@ -22,7 +22,6 @@ import (
 	"github.com/jcchavezs/mergefs"
 	"github.com/jcchavezs/mergefs/io"
 	"github.com/rs/zerolog"
-	"istio.io/istio/pkg/cache"
 )
 
 type AppConfig struct {
@@ -35,7 +34,7 @@ type AppConfig struct {
 
 type Application struct {
 	waf     coraza.WAF
-	cache   cache.ExpiringCache
+	cache   *ttlCache
 	asyncWg sync.WaitGroup
 	asyncMu sync.Mutex
 	draining bool
@@ -415,10 +414,9 @@ func (a AppConfig) NewApplication() (*Application, error) {
 	}
 	app.waf = waf
 
-	const defaultExpire = time.Second * 10
 	const defaultEvictionInterval = time.Second * 1
 
-	app.cache = cache.NewTTLWithCallback(defaultExpire, defaultEvictionInterval, func(key, value any) {
+	app.cache = newTTLCache(defaultEvictionInterval, func(key, value any) {
 		// everytime a transaction runs into a timeout it gets closed.
 		t := value.(*transaction)
 		if !t.m.TryLock() {
