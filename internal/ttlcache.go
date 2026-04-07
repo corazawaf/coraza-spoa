@@ -19,19 +19,26 @@ type ttlCache struct {
 	entries          map[any]*ttlEntry
 	evictionCallback func(key, value any)
 	stopCh           chan struct{}
+	stopOnce         sync.Once
+	done             chan struct{}
 }
 
 func newTTLCache(evictionInterval time.Duration, onEvict func(key, value any)) *ttlCache {
+	if evictionInterval <= 0 {
+		panic("ttlcache: evictionInterval must be positive")
+	}
 	c := &ttlCache{
 		entries:          make(map[any]*ttlEntry),
 		evictionCallback: onEvict,
 		stopCh:           make(chan struct{}),
+		done:             make(chan struct{}),
 	}
 	go c.evictLoop(evictionInterval)
 	return c
 }
 
 func (c *ttlCache) evictLoop(interval time.Duration) {
+	defer close(c.done)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -68,16 +75,23 @@ func (c *ttlCache) SetWithExpiration(key, value any, ttl time.Duration) {
 }
 
 func (c *ttlCache) Get(key any) (any, bool) {
+	now := time.Now()
 	c.mu.Lock()
 	e, ok := c.entries[key]
-	c.mu.Unlock()
 	if !ok {
+		c.mu.Unlock()
 		return nil, false
 	}
-	if time.Now().After(e.expiresAt) {
+	if now.After(e.expiresAt) {
+		value := e.value
+		delete(c.entries, key)
+		c.mu.Unlock()
+		c.evictionCallback(key, value)
 		return nil, false
 	}
-	return e.value, true
+	value := e.value
+	c.mu.Unlock()
+	return value, true
 }
 
 func (c *ttlCache) Remove(key any) {
@@ -87,5 +101,8 @@ func (c *ttlCache) Remove(key any) {
 }
 
 func (c *ttlCache) stop() {
-	close(c.stopCh)
+	c.stopOnce.Do(func() {
+		close(c.stopCh)
+	})
+	<-c.done
 }

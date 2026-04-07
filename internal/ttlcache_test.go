@@ -5,6 +5,7 @@ package internal
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -88,9 +89,9 @@ func TestTTLCache_EvictionCallback(t *testing.T) {
 }
 
 func TestTTLCache_EvictionCallbackNotCalledAfterRemove(t *testing.T) {
-	called := false
+	var called atomic.Bool
 	c := newTTLCache(10*time.Millisecond, func(_, _ any) {
-		called = true
+		called.Store(true)
 	})
 	defer c.stop()
 
@@ -99,7 +100,7 @@ func TestTTLCache_EvictionCallbackNotCalledAfterRemove(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	if called {
+	if called.Load() {
 		t.Fatal("eviction callback should not be called for manually removed key")
 	}
 }
