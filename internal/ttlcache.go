@@ -15,9 +15,10 @@ type ttlEntry struct {
 
 // ttlCache is a thread-safe cache with per-entry TTL and an eviction callback.
 // The eviction callback is invoked without holding any cache locks; callers
-// should ensure the callback does not re-enter the cache to avoid races or
-// unexpected ordering. When Get finds an expired entry, the callback is called
-// synchronously on the calling goroutine before Get returns.
+// should ensure the callback does not re-enter the cache, as re-entrancy may
+// lead to surprising ordering or recursive callback behavior. When Get finds
+// an expired entry, the callback is called synchronously on the calling
+// goroutine before Get returns.
 type ttlCache struct {
 	mu               sync.Mutex
 	entries          map[any]*ttlEntry
@@ -60,7 +61,7 @@ func (c *ttlCache) evictExpired() {
 	c.mu.Lock()
 	var expired []struct{ k, v any }
 	for k, e := range c.entries {
-		if now.After(e.expiresAt) {
+		if !now.Before(e.expiresAt) {
 			expired = append(expired, struct{ k, v any }{k, e.value})
 			delete(c.entries, k)
 		}
@@ -86,7 +87,7 @@ func (c *ttlCache) Get(key any) (any, bool) {
 		c.mu.Unlock()
 		return nil, false
 	}
-	if now.After(e.expiresAt) {
+	if !now.Before(e.expiresAt) {
 		value := e.value
 		delete(c.entries, key)
 		c.mu.Unlock()

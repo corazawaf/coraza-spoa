@@ -105,6 +105,48 @@ func TestTTLCache_EvictionCallbackNotCalledAfterRemove(t *testing.T) {
 	}
 }
 
+func TestTTLCache_GetEagerExpiry(t *testing.T) {
+	var mu sync.Mutex
+	evictedKeys := []any{}
+
+	c := newTTLCache(time.Minute, func(k, _ any) {
+		mu.Lock()
+		evictedKeys = append(evictedKeys, k)
+		mu.Unlock()
+	})
+	defer c.stop()
+
+	c.SetWithExpiration("key", "value", time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
+
+	// Get should return ok=false and invoke the eviction callback synchronously.
+	_, ok := c.Get("key")
+	if ok {
+		t.Fatal("expected expired key to be absent")
+	}
+
+	mu.Lock()
+	count := len(evictedKeys)
+	mu.Unlock()
+	if count != 1 {
+		t.Fatalf("expected eviction callback called exactly once, got %d", count)
+	}
+
+	// A second Get should not trigger the callback again (entry was deleted).
+	_, ok = c.Get("key")
+	if ok {
+		t.Fatal("expected key to remain absent")
+	}
+
+	mu.Lock()
+	count = len(evictedKeys)
+	mu.Unlock()
+	if count != 1 {
+		t.Fatalf("expected eviction callback still called exactly once, got %d", count)
+	}
+}
+
+
 func TestTTLCache_Concurrent(t *testing.T) {
 	c := newTTLCache(time.Millisecond*10, func(_, _ any) {})
 	defer c.stop()
