@@ -4,12 +4,12 @@ go 1.25.7
 
 require (
 	github.com/corazawaf/coraza-coreruleset/v4 v4.25.0
-	github.com/corazawaf/coraza/v3 v3.6.0
+	github.com/corazawaf/coraza/v3 v3.7.0
 	github.com/dropmorepackets/haproxy-go v0.0.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/jcchavezs/mergefs v0.1.1
 	github.com/magefile/mage v1.17.1
-	github.com/mccutchen/go-httpbin/v2 v2.21.0
+	github.com/mccutchen/go-httpbin/v2 v2.22.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.0
 	gopkg.in/yaml.v3 v3.0.1
