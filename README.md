@@ -33,18 +33,20 @@ Configure HAProxy to exchange messages with the SPOA. The example SPOE configura
 ```ini
 # /etc/haproxy/coraza.cfg
 spoe-agent coraza-agent
+    groups      coraza-req
     ...
     use-backend coraza-spoa
 
 spoe-message coraza-req
-    args app=str(sample_app) id=unique-id src-ip=src ...
+    args app=var(txn.coraza.app) src-ip=src ...
+
+spoe-group coraza-req
+    messages coraza-req
 ```
 
-The application name from `config.yaml` must match the `app=` name.
+The application name from `config.yaml` must match the `app` variable set in the HAProxy configuration (see below).
 
 The backend defined in `use-backend` must match a `haproxy.cfg` backend which directs requests to the SPOA daemon reachable via `127.0.0.1:9000`.
-
-Instead of the hard coded application name `str(sample_app)` you can use some HAProxy variables. For example, frontend name `fe_name`.
 
 ## HAProxy
 
@@ -53,7 +55,11 @@ Configure HAProxy with a frontend, which contains a `filter` statement to forwar
 ```haproxy
 # /etc/haproxy/haproxy.cfg
 frontend web
+    # Set application name variable for SPOA
+    http-request set-var(txn.coraza.app) str(sample_app)
+    
     filter spoe engine coraza config /etc/haproxy/coraza.cfg
+    http-request send-spoe-group coraza coraza-req
     ...
     http-request deny deny_status 403 hdr waf-block "request" if { var(txn.coraza.action) -m str deny }
     ...
@@ -64,11 +70,11 @@ backend coraza-spoa
     server s1 127.0.0.1:9000 check
 ```
 
-A comprehensive HAProxy configuration example can be found in [example/haproxy/coraza.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg).
+A comprehensive HAProxy configuration example can be found in [example/haproxy/haproxy.cfg](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg).
 
-Because, in the SPOE configuration file (coraza.cfg), we declare to use the backend [coraza-spoa](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L13) to communicate with the service, so we need also to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L50):
+In the SPOE configuration file (coraza.cfg), we declare the [coraza-spoa backend](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/coraza.cfg#L13) to communicate with the service, so we also need to define it in the [HAProxy file](https://github.com/corazawaf/coraza-spoa/blob/main/example/haproxy/haproxy.cfg#L54).
 
-If you intend to access coraza-spoa service from another machine, remember to change the binding networking directives (IPAddressAllow/IPAddressDeny) in [contrib/coraza-spoa.service](https://github.com/corazawaf/coraza-spoa/blob/main/contrib/coraza-spoa.service)
+**Note:** It is recommended to run coraza-spoa on the same host as HAProxy to minimize latency. The [systemd service file](https://github.com/corazawaf/coraza-spoa/blob/main/contrib/coraza-spoa.service) restricts network access to localhost only by default for security.
 
 ## HAProxy Logging
 
@@ -127,3 +133,7 @@ To avoid conflicts with the OWASP Core Rule Set (CRS) and to ensure that the SPO
 - Build the coraza-spoa image `cd ./example ; docker compose build`
 - Run haproxy, coraza-spoa and a mock server `docker compose up`
 - Perform a request which gets blocked by the WAF: `curl http://localhost:8080/\?x\=/etc/passwd`
+
+## Kubernetes
+
+For deploying Coraza SPOA on Kubernetes, you can use the official Helm chart available at [corazawaf/charts](https://github.com/corazawaf/charts/tree/main/charts/coraza-spoa).

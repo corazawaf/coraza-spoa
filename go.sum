@@ -8,6 +8,10 @@ github.com/corazawaf/coraza-coreruleset/v4 v4.25.0 h1:tqFO1lfVpTiyWtlN618OXpZMfw
 github.com/corazawaf/coraza-coreruleset/v4 v4.25.0/go.mod h1:nRuGXITxOPvsLF2VxaTB7pYok8QB8BitX3ZenXcUryY=
 github.com/corazawaf/coraza/v3 v3.6.0 h1:rfsGl6eRBzzUAyADFcpuO7qXLt0DZtYWhfTIuhcyAjQ=
 github.com/corazawaf/coraza/v3 v3.6.0/go.mod h1:q7gszZCSufoHIy9jV2NCgk+glYwZpP2mIKgbu2dZkvE=
+github.com/corazawaf/coraza/v3 v3.7.0 h1:LIQqu1r+l6e/U/gyiZeykWaNNBY1TzRLz+aaI+QYEEM=
+github.com/corazawaf/coraza/v3 v3.7.0/go.mod h1:dOSt5evqC7EstouEv6ghhui01+oVUwp9X1vybWwqTlo=
+github.com/corazawaf/libinjection-go v0.2.3 h1:rKiRM8sqbb2A+brb5N8wQ2gyg4oL0tsr3rcMJwVB5Yc=
+github.com/corazawaf/libinjection-go v0.2.3/go.mod h1:Ik/+w3UmTWH9yn366RgS9D95K3y7Atb5m/H/gXzzPCk=
 github.com/corazawaf/libinjection-go v0.3.2 h1:9rrKt0lpg4WvUXt+lwS06GywfqRXXsa/7JcOw5cQLwI=
 github.com/corazawaf/libinjection-go v0.3.2/go.mod h1:Ik/+w3UmTWH9yn366RgS9D95K3y7Atb5m/H/gXzzPCk=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
@@ -51,6 +55,8 @@ github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWE
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
 github.com/mccutchen/go-httpbin/v2 v2.21.0 h1:0xs/5eCHihKtS6O8DRaioU2HXCyF/y+63PPFiXgOpTs=
 github.com/mccutchen/go-httpbin/v2 v2.21.0/go.mod h1:8hkN5rHf0QvJYEovZ8u/Dudtqyj6Z5gxQaW7scQfT0Y=
+github.com/mccutchen/go-httpbin/v2 v2.22.0 h1:VX7gXFcqJJdxdZGHGjsZcPi/Gh7FXp25t56tA9w7PcY=
+github.com/mccutchen/go-httpbin/v2 v2.22.0/go.mod h1:8hkN5rHf0QvJYEovZ8u/Dudtqyj6Z5gxQaW7scQfT0Y=
 github.com/miekg/dns v1.1.58 h1:ca2Hdkz+cDg/7eNF6V56jjzuZ4aCAE+DbVkILdQWG/4=
 github.com/miekg/dns v1.1.58/go.mod h1:Ypv+3b/KadlvW9vJfXOTf300O4UqaHFzFCuHz+rPkBY=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
