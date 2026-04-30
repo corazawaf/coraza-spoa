@@ -15,6 +15,7 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"syscall"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
@@ -118,7 +119,8 @@ func main() {
 
 	if healthAndMetricsAddr != "" {
 		go func() {
-			http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 				if r.Method != http.MethodGet {
 					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 					return
@@ -129,9 +131,17 @@ func main() {
 				}
 			})
 
-			http.Handle("/metrics", promhttp.Handler())
+			mux.Handle("/metrics", promhttp.Handler())
 
-			if err := http.ListenAndServe(healthAndMetricsAddr, nil); err != nil {
+			srv := &http.Server{
+				Addr:    healthAndMetricsAddr,
+				Handler: mux,
+				ReadHeaderTimeout: 5 * time.Second,
+				WriteTimeout:      10 * time.Second,
+				IdleTimeout:       60 * time.Second,
+			}
+
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				globalLogger.Error().Err(err).Msg("Health and metrics server failed")
 			}
 		}()
