@@ -28,14 +28,15 @@ var (
 )
 
 var (
-	configPath           string
-	validateConfig       bool
-	autoReload           bool
-	cpuProfile           string
-	memProfile           string
-	healthAndMetricsAddr string
-	showVersion          bool
-	globalLogger         = zerolog.New(os.Stderr).With().Timestamp().Logger()
+	configPath     string
+	validateConfig bool
+	autoReload     bool
+	cpuProfile     string
+	memProfile     string
+	metricsAddr    string
+	healthAddr     string
+	showVersion    bool
+	globalLogger   = zerolog.New(os.Stderr).With().Timestamp().Logger()
 )
 
 func main() {
@@ -44,7 +45,8 @@ func main() {
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
-	flag.StringVar(&healthAndMetricsAddr, "health-and-metrics-addr", "", "ip:port bind for prometheus metrics and health checks")
+	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics")
+	flag.StringVar(&healthAddr, "health-addr", "", "ip:port bind for health checks")
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
 
@@ -93,84 +95,53 @@ func main() {
 		return
 	}
 
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
+	// Create a root context that is canceled on SIGINT or SIGTERM
+	rootCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	
+	// Create a child context for the agent that can be canceled independently
+	rootCtx, rootCancel := context.WithCancel(rootCtx)
+	defer rootCancel()
 
-	network, address := cfg.networkAddressFromBind()
-	l, err := (&net.ListenConfig{}).Listen(ctx, network, address)
-	if err != nil {
-		globalLogger.Fatal().Err(err).Msg("Failed opening socket")
-	}
+	// Listen for SIGHUP to trigger configuration reload
+	reloadCh := make(chan os.Signal, 1)
+	signal.Notify(reloadCh, syscall.SIGHUP)
 
-	a := &internal.Agent{
-		Context:            ctx,
+	agent := &internal.Agent{
+		Context:            rootCtx,
 		DefaultApplication: apps[cfg.DefaultApplication],
 		Applications:       apps,
 		Logger:             globalLogger,
 	}
-	go func() {
-		defer cancelFunc()
+	
+	// Start the agent in a separate goroutine
+	go runAgent(rootCtx, cfg, agent, rootCancel)
+	
+	if metricsAddr != "" {
+		go runMetricsServer(rootCtx, metricsAddr)
+	}
 
-		globalLogger.Info().Msg("Starting coraza-spoa")
-		if err := a.Serve(l); err != nil {
-			globalLogger.Fatal().Err(err).Msg("Listener closed")
-		}
-	}()
-
-	if healthAndMetricsAddr != "" {
-		go func() {
-			mux := http.NewServeMux()
-			mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodGet {
-					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-					return
-				}
-				w.WriteHeader(http.StatusOK)
-				if _, err := w.Write([]byte("ok")); err != nil {
-					globalLogger.Error().Err(err).Msg("Health check response error")
-				}
-			})
-
-			mux.Handle("/metrics", promhttp.Handler())
-
-			srv := &http.Server{
-				Addr:    healthAndMetricsAddr,
-				Handler: mux,
-				ReadHeaderTimeout: 5 * time.Second,
-				WriteTimeout:      10 * time.Second,
-				IdleTimeout:       60 * time.Second,
-			}
-
-			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				globalLogger.Error().Err(err).Msg("Health and metrics server failed")
-			}
-		}()
+	if healthAddr != "" {
+		go runHealthServer(rootCtx, healthAddr)
 	}
 
 	if autoReload {
 		go func() {
-			if err := cfg.watchConfig(a); err != nil {
+			if err := cfg.watchConfig(agent); err != nil {
 				globalLogger.Fatal().Err(err).Msg("Config watcher failed")
 			}
 		}()
 	}
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGUSR1, syscall.SIGINT)
 outer:
 	for {
-		sig := <-sigCh
-		switch sig {
-		case syscall.SIGTERM:
-			globalLogger.Info().Msg("Received SIGTERM, shutting down...")
-			// this return will run cancel() and close the server
+		select {
+		case <-rootCtx.Done():
+			globalLogger.Info().Msg("Received SIGTERM/SIGINT, shutting down...")
 			break outer
-		case syscall.SIGINT:
-			globalLogger.Info().Msg("Received SIGINT, shutting down...")
-			break outer
-		case syscall.SIGHUP:
+		case <-reloadCh:
 			globalLogger.Info().Msg("Received SIGHUP, reloading configuration...")
-			newCfg, err := cfg.reloadConfig(a)
+			newCfg, err := cfg.reloadConfig(agent)
 			if err != nil {
 				globalLogger.Error().Err(err).Msg("Failed to reload configuration, using old configuration")
 				continue
@@ -179,11 +150,8 @@ outer:
 		}
 	}
 
-	// Stop accepting new connections before draining background work.
-	cancelFunc()
-
 	// Drain in-flight detect-only background evaluations before exit.
-	a.DrainDetectOnly()
+	agent.DrainDetectOnly()
 
 	if memProfile != "" {
 		f, err := os.Create(memProfile)
@@ -195,5 +163,87 @@ outer:
 		if err := pprof.WriteHeapProfile(f); err != nil {
 			globalLogger.Fatal().Err(err).Msg("Could not write memory profile")
 		}
+	}
+}
+
+func runAgent(ctx context.Context, cfg *config, agent *internal.Agent, rootCancel context.CancelFunc) {
+	network, address := cfg.networkAddressFromBind()
+	l, err := (&net.ListenConfig{}).Listen(ctx, network, address)
+	if err != nil {
+		globalLogger.Fatal().Err(err).Msg("Failed opening socket")
+		rootCancel()
+		return
+	}
+
+
+	// Ensure the listener is closed when the context is canceled
+	go func() {
+		<-ctx.Done()
+		if err := l.Close(); err != nil {
+			globalLogger.Error().Err(err).Msg("Failed closing listener")
+		}
+	}()
+
+
+	globalLogger.Info().Msg("Starting coraza-spoa")
+	if err := agent.Serve(l); err != nil {
+		select {
+		case <-ctx.Done():
+			// Listener was closed due to shutdown, ignore error
+			// and exit gracefully
+			return
+		default:
+			// Unexpected error, log and exit
+		}
+
+		globalLogger.Fatal().Err(err).Msg("Listener closed")
+		rootCancel()
+	}
+}
+
+func runMetricsServer(ctx context.Context, addr string) {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		globalLogger.Error().Err(err).Msg("Metrics server failed")
+	}
+}
+
+func runHealthServer(ctx context.Context, addr string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("ok")); err != nil {
+			globalLogger.Error().Err(err).Msg("Health check response error")
+		}
+	})
+
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		BaseContext: func(net.Listener) context.Context {
+			return ctx
+		},
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		globalLogger.Error().Err(err).Msg("Health server failed")
 	}
 }
