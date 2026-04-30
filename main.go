@@ -27,14 +27,14 @@ var (
 )
 
 var (
-	configPath     string
-	validateConfig bool
-	autoReload     bool
-	cpuProfile     string
-	memProfile     string
-	metricsAddr    string
-	showVersion    bool
-	globalLogger   = zerolog.New(os.Stderr).With().Timestamp().Logger()
+	configPath           string
+	validateConfig       bool
+	autoReload           bool
+	cpuProfile           string
+	memProfile           string
+	healthAndMetricsAddr string
+	showVersion          bool
+	globalLogger         = zerolog.New(os.Stderr).With().Timestamp().Logger()
 )
 
 func main() {
@@ -43,7 +43,7 @@ func main() {
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
-	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics")
+	flag.StringVar(&healthAndMetricsAddr, "health-and-metrics-addr", "", "ip:port bind for prometheus metrics and health checks")
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
 
@@ -116,11 +116,23 @@ func main() {
 		}
 	}()
 
-	if metricsAddr != "" {
+	if healthAndMetricsAddr != "" {
 		go func() {
+			http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+					return
+				}
+				w.WriteHeader(http.StatusOK)
+				if _, err := w.Write([]byte("ok")); err != nil {
+					globalLogger.Error().Err(err).Msg("Health check response error")
+				}
+			})
+
 			http.Handle("/metrics", promhttp.Handler())
-			if err := http.ListenAndServe(metricsAddr, nil); err != nil {
-				globalLogger.Error().Err(err).Msg("Metrics server failed")
+
+			if err := http.ListenAndServe(healthAndMetricsAddr, nil); err != nil {
+				globalLogger.Error().Err(err).Msg("Health and metrics server failed")
 			}
 		}()
 	}
