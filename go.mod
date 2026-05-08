@@ -8,10 +8,10 @@ require (
 	github.com/dropmorepackets/haproxy-go v0.0.8
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/jcchavezs/mergefs v0.1.1
-	github.com/magefile/mage v1.17.1
-	github.com/mccutchen/go-httpbin/v2 v2.22.0
+	github.com/magefile/mage v1.17.2
+	github.com/mccutchen/go-httpbin/v2 v2.22.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/rs/zerolog v1.35.0
+	github.com/rs/zerolog v1.35.1
 	gopkg.in/yaml.v3 v3.0.1
 	istio.io/istio v0.0.0-20240218163812-d80ef7b19049
 )
