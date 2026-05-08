@@ -10,6 +10,18 @@ import (
 	"time"
 )
 
+// pollUntil repeatedly checks condition until it returns true or deadline is exceeded.
+// Returns true if condition was met, false if deadline was reached.
+func pollUntil(deadline time.Time, interval time.Duration, condition func() bool) bool {
+	for time.Now().Before(deadline) {
+		if condition() {
+			return true
+		}
+		time.Sleep(interval)
+	}
+	return condition()
+}
+
 func TestTTLCache_SetAndGet(t *testing.T) {
 	c := newTTLCache(time.Minute, func(_, _ any) {})
 	defer c.stop()
@@ -53,10 +65,14 @@ func TestTTLCache_Expiry(t *testing.T) {
 	defer c.stop()
 
 	c.SetWithExpiration("key", "value", time.Millisecond)
-	time.Sleep(10 * time.Millisecond)
 
-	_, ok := c.Get("key")
-	if ok {
+	deadline := time.Now().Add(100 * time.Millisecond)
+	expired := pollUntil(deadline, time.Millisecond, func() bool {
+		_, ok := c.Get("key")
+		return !ok
+	})
+
+	if !expired {
 		t.Fatal("expected key to be expired")
 	}
 }
@@ -70,21 +86,23 @@ func TestTTLCache_EvictionCallback(t *testing.T) {
 		evicted[k] = v
 		mu.Unlock()
 	})
-	defer c.stop()
 
 	c.SetWithExpiration("a", 1, 10*time.Millisecond)
 	c.SetWithExpiration("b", 2, 10*time.Millisecond)
 
-	// Wait for eviction loop to fire
-	time.Sleep(100 * time.Millisecond)
+	deadline := time.Now().Add(200 * time.Millisecond)
+	bothEvicted := pollUntil(deadline, 5*time.Millisecond, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return evicted["a"] == 1 && evicted["b"] == 2
+	})
 
-	mu.Lock()
-	defer mu.Unlock()
-	if evicted["a"] != 1 {
-		t.Errorf("expected 'a' to be evicted with value 1, got %v", evicted["a"])
-	}
-	if evicted["b"] != 2 {
-		t.Errorf("expected 'b' to be evicted with value 2, got %v", evicted["b"])
+	c.stop()
+
+	if !bothEvicted {
+		mu.Lock()
+		defer mu.Unlock()
+		t.Errorf("expected both keys to be evicted: a=%v, b=%v", evicted["a"], evicted["b"])
 	}
 }
 
@@ -93,12 +111,17 @@ func TestTTLCache_EvictionCallbackNotCalledAfterRemove(t *testing.T) {
 	c := newTTLCache(10*time.Millisecond, func(_, _ any) {
 		called.Store(true)
 	})
-	defer c.stop()
 
 	c.SetWithExpiration("key", "val", 10*time.Millisecond)
 	c.Remove("key")
 
-	time.Sleep(100 * time.Millisecond)
+	// Wait for at least one eviction cycle to pass
+	deadline := time.Now().Add(100 * time.Millisecond)
+	pollUntil(deadline, 5*time.Millisecond, func() bool {
+		return false // Just wait for the deadline
+	})
+
+	c.stop()
 
 	if called.Load() {
 		t.Fatal("eviction callback should not be called for manually removed key")
@@ -117,29 +140,44 @@ func TestTTLCache_GetEagerExpiry(t *testing.T) {
 	defer c.stop()
 
 	c.SetWithExpiration("key", "value", time.Millisecond)
-	time.Sleep(10 * time.Millisecond)
 
-	// Get should return ok=false and invoke the eviction callback synchronously.
-	_, ok := c.Get("key")
-	if ok {
+	// Poll until the key expires when accessed via Get
+	deadline := time.Now().Add(100 * time.Millisecond)
+	keyExpired := pollUntil(deadline, time.Millisecond, func() bool {
+		_, ok := c.Get("key")
+		return !ok
+	})
+
+	if !keyExpired {
 		t.Fatal("expected expired key to be absent")
 	}
 
-	mu.Lock()
-	count := len(evictedKeys)
-	mu.Unlock()
-	if count != 1 {
+	// Poll until the eviction callback is invoked (it's async now)
+	deadline = time.Now().Add(100 * time.Millisecond)
+	callbackInvoked := pollUntil(deadline, time.Millisecond, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(evictedKeys) == 1
+	})
+
+	if !callbackInvoked {
+		mu.Lock()
+		count := len(evictedKeys)
+		mu.Unlock()
 		t.Fatalf("expected eviction callback called exactly once, got %d", count)
 	}
 
 	// A second Get should not trigger the callback again (entry was deleted).
-	_, ok = c.Get("key")
+	_, ok := c.Get("key")
 	if ok {
 		t.Fatal("expected key to remain absent")
 	}
 
+	// Give a bit of time for any spurious callback (shouldn't happen)
+	time.Sleep(10 * time.Millisecond)
+
 	mu.Lock()
-	count = len(evictedKeys)
+	count := len(evictedKeys)
 	mu.Unlock()
 	if count != 1 {
 		t.Fatalf("expected eviction callback still called exactly once, got %d", count)
