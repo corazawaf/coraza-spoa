@@ -138,10 +138,11 @@ func TestDrainDetectOnly_ConcurrentRace(t *testing.T) {
 	var started sync.WaitGroup
 	started.Add(workers)
 
-	var asyncCount atomic.Int32
+	var workersDone sync.WaitGroup
+	workersDone.Add(workers)
 
-	// entered tracks how many workers have entered HandleResponse.
 	var entered atomic.Int32
+	var completed atomic.Int32
 
 	// Launch workers that simulate detect-only requests.
 	for i := 0; i < workers; i++ {
@@ -150,16 +151,16 @@ func TestDrainDetectOnly_ConcurrentRace(t *testing.T) {
 		app.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, 10*time.Second)
 
 		go func(id string) {
+			defer workersDone.Done()
 			started.Done()
 			started.Wait() // all workers start at the same time
 
 			entered.Add(1)
 			aw, msg := buildDetectOnlyMessage(t, id)
-			err := app.HandleResponse(context.Background(), aw, msg)
-			if err != nil {
+			if err := app.HandleResponse(context.Background(), aw, msg); err != nil {
 				return
 			}
-			asyncCount.Add(1)
+			completed.Add(1)
 		}(tx.ID())
 	}
 
@@ -172,10 +173,13 @@ func TestDrainDetectOnly_ConcurrentRace(t *testing.T) {
 
 	app.DrainDetectOnly()
 
-	// After drain, all work (async or sync fallback) must be complete.
-	// If the race existed, the -race detector would flag it here.
-	if asyncCount.Load() == 0 {
-		t.Fatal("no workers completed — test did not exercise any work")
+	// Join the test's worker goroutines so any sync-fallback HandleResponse
+	// calls (not tracked by asyncWg) have returned before we assert. The
+	// -race detector is the real signal here; the count just confirms the
+	// test exercised the code path.
+	workersDone.Wait()
+
+	if got := completed.Load(); got != workers {
+		t.Fatalf("expected %d completed requests, got %d", workers, got)
 	}
-	t.Logf("completed requests: %d", asyncCount.Load())
 }
