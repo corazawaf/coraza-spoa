@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.1](https://github.com/corazawaf/coraza-spoa/compare/v0.7.0...v0.7.1) (2026-05-08)
+
+
+### Bug Fixes
+
+* **deps:** update all non-major dependencies in .github/workflows/ftw.yaml ([4e6ec42](https://github.com/corazawaf/coraza-spoa/commit/4e6ec428f4561d0133c8675151f6ed23750c34fc))
+* **deps:** update all non-major dependencies in go.mod ([6a78fcf](https://github.com/corazawaf/coraza-spoa/commit/6a78fcfad9db4eb45ef3aaea0eec89850fc9d0c0))
+* **ttlcache:** precise expiry boundary, accurate doc comment, eager-Get test coverage ([#353](https://github.com/corazawaf/coraza-spoa/issues/353)) ([298ceee](https://github.com/corazawaf/coraza-spoa/commit/298ceee4cba24530d526ba879adc37e08d945455)), closes [#134](https://github.com/corazawaf/coraza-spoa/issues/134)
+
 ## [0.7.0](https://github.com/corazawaf/coraza-spoa/compare/v0.6.1...v0.7.0) (2026-04-07)
 
 
