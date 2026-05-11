@@ -128,6 +128,38 @@ To avoid conflicts with the OWASP Core Rule Set (CRS) and to ensure that the SPO
 * **Infrastructure & Whitelists (IDs: 100000 - 189999):** Use this range for IP whitelists, disabling specific CRS rules, or tuning (e.g., GeoIP limits). Rules in this range are **intentionally ignored** by the SPOA agent's attack counter to prevent false positives in your HAProxy metrics.
 * **Custom Attack & Hardening Rules (IDs: 190000 - 199999):** Use this range for actual security blocks and custom hardening rules. Rules in this range are actively monitored. If triggered, they will increment the `rules_hit` counter and their IDs will be exported in the `rule_ids` variable.
 
+## Prometheus Metrics
+
+When started with `--metrics-addr=<host>:<port>`, Coraza SPOA exposes Prometheus metrics at `/metrics`. The following series are available:
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `coraza_handle_spoe_duration_seconds` | Histogram | - | Wall-clock duration of each SPOE message handler call, using the default Prometheus buckets. |
+| `coraza_actions_total` | CounterVec | `action`, `application` | WAF verdicts per request. `action` is `allow` when no rule interrupted, otherwise the interruption action (`deny`, `drop`, `redirect`, etc). `application` is the requested SPOE `app` arg when it matches a configured application, or the `default_application`'s name when fallback handles an unknown name - keeping the label bounded to `applications[].name` even if the SPOE `app` arg is sourced from request data (e.g. `hdr(host)`). The unmatched requested name is still logged at debug level. Counted exactly once per request - at the response phase when `ResponseCheck` is enabled, or at the request phase otherwise. |
+| `coraza_rule_triggers_total` | CounterVec | `rule_id`, `severity` | One increment per matched attack-range rule (CRS `910000-959999` and local `190000-199999`). Rules outside these ranges (whitelists, tuning) are intentionally excluded to keep cardinality bounded. `severity` is one of `emergency`, `alert`, `critical`, `error`, `warning`, `notice`, `info`, `debug`, `unknown`. |
+| `coraza_anomaly_score` | Histogram | - | Distribution of the CRS `tx.blocking_inbound_anomaly_score` observed at the end of each transaction. Buckets are tuned for CRS scoring: `0, 3, 5, 7, 10, 15, 25, 50, 100`. The `5` boundary corresponds to the default CRS deny threshold. |
+
+`coraza_actions_total`, `coraza_rule_triggers_total`, and `coraza_anomaly_score` are observed exactly once per transaction even when `ResponseCheck` is enabled (the response phase is treated as the final verdict; the request phase is treated as final only on interruption or when `ResponseCheck` is off).
+
+When `ResponseCheck` is enabled but HAProxy never fires `on-http-response` for a request (e.g. backend timeout, client disconnect), the transaction sits in the response-cache until `transaction_ttl_ms` expires. `coraza_rule_triggers_total` and `coraza_anomaly_score` are still recorded from the request-phase observations when the cache evicts the orphaned transaction; `coraza_actions_total` is not - an orphaned transaction never produced a verdict, so it is excluded rather than mislabelled as `allow`.
+
+### Example queries
+
+```promql
+# Deny rate (denials per second) per application.
+sum by (application) (rate(coraza_actions_total{action="deny"}[5m]))
+
+# Deny ratio per application.
+sum by (application) (rate(coraza_actions_total{action="deny"}[5m]))
+  / sum by (application) (rate(coraza_actions_total[5m]))
+
+# Top 10 most-triggered attack rules.
+topk(10, sum by (rule_id) (rate(coraza_rule_triggers_total[15m])))
+
+# 95th percentile anomaly score over the last 15 minutes.
+histogram_quantile(0.95, sum by (le) (rate(coraza_anomaly_score_bucket[15m])))
+```
+
 ## Docker
 
 - Build the coraza-spoa image `cd ./example ; docker compose build`
