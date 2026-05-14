@@ -41,7 +41,7 @@ func buildMessage(t *testing.T, name string, writeKV func(*encoding.KVWriter) er
 
 func TestAgentHandleSPOA_ResponseWithoutApp_DoesNotPanic(t *testing.T) {
 	app := newTestApp(t)
-	tx := app.waf.NewTransactionWithID("test-response-without-app-kv")
+	tx := app.waf.NewTransactionWithID("response-no-app")
 	app.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, 10*time.Second)
 
 	a := &Agent{
@@ -77,4 +77,27 @@ func TestAgentHandleSPOA_ResponseWithoutApp_DoesNotPanic(t *testing.T) {
 	if _, ok := app.cache.Get(tx.ID()); ok {
 		t.Fatalf("expected transaction %q to be removed from cache after response handling", tx.ID())
 	}
+}
+
+func TestSingleApplication(t *testing.T) {
+	t.Run("empty map", func(t *testing.T) {
+		if got := singleApplication(map[string]*Application{}); got != nil {
+			t.Fatal("expected nil for empty map")
+		}
+	})
+
+	t.Run("single app", func(t *testing.T) {
+		only := &Application{}
+		if got := singleApplication(map[string]*Application{"only": only}); got != only {
+			t.Fatal("expected sole application")
+		}
+	})
+
+	t.Run("multiple apps", func(t *testing.T) {
+		a := &Application{}
+		b := &Application{}
+		if got := singleApplication(map[string]*Application{"a": a, "b": b}); got != nil {
+			t.Fatal("expected nil when map has multiple applications")
+		}
+	})
 }
