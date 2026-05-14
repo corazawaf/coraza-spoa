@@ -98,14 +98,12 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		a.mtx.RLock()
 		app = a.DefaultApplication
 		if app == nil && len(a.Applications) == 1 {
-			for _, candidate := range a.Applications {
-				app = candidate
-				break
+			for _, app = range a.Applications {
 			}
 		}
 		a.mtx.RUnlock()
 		if app == nil {
-			a.Logger.Panic().Str("expected", "app").Str("got", string(k.NameBytes())).Msg("response message missing app and no fallback application available")
+			a.Logger.Panic().Str("first_kv", string(k.NameBytes())).Msg("response message missing app KV entry and no fallback application available")
 			return
 		}
 
