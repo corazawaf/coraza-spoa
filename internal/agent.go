@@ -92,6 +92,8 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		appName string
 		err     error
 	)
+	// Response messages may omit "app". In that case the first KV entry belongs
+	// to the response payload (typically "id"), so we must preserve and process it.
 	if isResponse && !k.NameEquals("app") {
 		a.mtx.RLock()
 		app = a.DefaultApplication

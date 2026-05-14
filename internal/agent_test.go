@@ -39,7 +39,7 @@ func buildMessage(t *testing.T, name string, writeKV func(*encoding.KVWriter) er
 	return msg
 }
 
-func TestAgentHandleSPOE_ResponseWithoutApp_DoesNotPanic(t *testing.T) {
+func TestAgentHandleSPOA_ResponseWithoutApp_DoesNotPanic(t *testing.T) {
 	app := newTestApp(t)
 	tx := app.waf.NewTransactionWithID("response-no-app")
 	app.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, 10*time.Second)
