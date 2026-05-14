@@ -608,7 +608,3 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, expor
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) error {
 	return a.handleResponse(ctx, writer, message, nil)
 }
-
-func (a *Application) handleResponseWithFirstKV(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message, first *encoding.KVEntry) error {
-	return a.handleResponse(ctx, writer, message, first)
-}

@@ -107,7 +107,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 			return
 		}
 
-		err = app.handleResponseWithFirstKV(ctx, writer, message, k)
+		err = app.handleResponse(ctx, writer, message, k)
 	} else {
 		appName = string(k.ValueBytes())
 		if !k.NameEquals("app") {
