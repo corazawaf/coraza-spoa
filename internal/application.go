@@ -246,7 +246,7 @@ type applicationResponse struct {
 	DetectOnly    bool
 }
 
-func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
+func (a *Application) handleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message, first *encoding.KVEntry) (err error) {
 	if !a.ResponseCheck {
 		return fmt.Errorf("got response but response check is disabled")
 	}
@@ -266,7 +266,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			encoding.ReleaseKVEntry(entry)
 		}
 	}()
-	for message.KV.Next(k) {
+	processKV := func(k *encoding.KVEntry) {
 		switch name := string(k.NameBytes()); name {
 		case "id":
 			res.ID = string(k.ValueBytes())
@@ -291,6 +291,12 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
+	}
+	if first != nil {
+		processKV(first)
+	}
+	for message.KV.Next(k) {
+		processKV(k)
 	}
 
 	if res.ID == "" {
@@ -597,4 +603,12 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, expor
 	}
 
 	return nil
+}
+
+func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) error {
+	return a.handleResponse(ctx, writer, message, nil)
+}
+
+func (a *Application) handleResponseWithFirstKV(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message, first *encoding.KVEntry) error {
+	return a.handleResponse(ctx, writer, message, first)
 }

@@ -68,11 +68,13 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	)
 
 	var messageHandler func(*Application, context.Context, *encoding.ActionWriter, *encoding.Message) error
+	isResponse := false
 	switch name := string(message.NameBytes()); name {
 	case messageCorazaRequest:
 		messageHandler = (*Application).HandleRequest
 	case messageCorazaResponse:
 		messageHandler = (*Application).HandleResponse
+		isResponse = true
 	default:
 		a.Logger.Debug().Str("message", name).Msg("unknown spoe message")
 		return
@@ -85,30 +87,53 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		return
 	}
 
-	appName := string(k.ValueBytes())
-	if !k.NameEquals("app") {
-		// Without knowing the app, we cannot continue. We could fall back to a default application,
-		// but all following code would have to support that as we now already read one of the kv entries.
-		a.Logger.Panic().Str("expected", "app").Str("got", string(k.NameBytes())).Msg("unexpected kv entry")
-		return
-	}
-
-	a.mtx.RLock()
-	app := a.Applications[appName]
-	a.mtx.RUnlock()
-	if app == nil && a.DefaultApplication != nil {
-		// If we cannot resolve the app but the default app is configured,
-		// we use the latter to process the request.
+	var (
+		app     *Application
+		appName string
+		err     error
+	)
+	if isResponse && !k.NameEquals("app") {
+		a.mtx.RLock()
 		app = a.DefaultApplication
-		a.Logger.Debug().Str("app", appName).Msg("app not found, using default app")
-	}
-	if app == nil {
-		// If we cannot resolve the app, we fail as this is an invalid configuration.
-		a.Logger.Panic().Str("app", appName).Msg("app not found")
-		return
-	}
+		if app == nil && len(a.Applications) == 1 {
+			for _, candidate := range a.Applications {
+				app = candidate
+				break
+			}
+		}
+		a.mtx.RUnlock()
+		if app == nil {
+			a.Logger.Panic().Str("expected", "app").Str("got", string(k.NameBytes())).Msg("response message missing app and no default application configured")
+			return
+		}
 
-	err := messageHandler(app, ctx, writer, message)
+		err = app.handleResponseWithFirstKV(ctx, writer, message, k)
+	} else {
+		appName = string(k.ValueBytes())
+		if !k.NameEquals("app") {
+			// Without knowing the app, we cannot continue. We could fall back to a default application,
+			// but all following code would have to support that as we now already read one of the kv entries.
+			a.Logger.Panic().Str("expected", "app").Str("got", string(k.NameBytes())).Msg("unexpected kv entry")
+			return
+		}
+
+		a.mtx.RLock()
+		app = a.Applications[appName]
+		a.mtx.RUnlock()
+		if app == nil && a.DefaultApplication != nil {
+			// If we cannot resolve the app but the default app is configured,
+			// we use the latter to process the request.
+			app = a.DefaultApplication
+			a.Logger.Debug().Str("app", appName).Msg("app not found, using default app")
+		}
+		if app == nil {
+			// If we cannot resolve the app, we fail as this is an invalid configuration.
+			a.Logger.Panic().Str("app", appName).Msg("app not found")
+			return
+		}
+
+		err = messageHandler(app, ctx, writer, message)
+	}
 	if err == nil {
 		return
 	}
