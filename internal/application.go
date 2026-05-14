@@ -266,28 +266,32 @@ func (a *Application) handleResponse(ctx context.Context, writer *encoding.Actio
 			encoding.ReleaseKVEntry(entry)
 		}
 	}()
-	processKV := func(k *encoding.KVEntry) {
-		switch name := string(k.NameBytes()); name {
+	processKV := func(entry *encoding.KVEntry) {
+		switch name := string(entry.NameBytes()); name {
 		case "id":
-			res.ID = string(k.ValueBytes())
+			res.ID = string(entry.ValueBytes())
 		case "version":
-			res.Version = string(k.ValueBytes())
+			res.Version = string(entry.ValueBytes())
 		case "status":
-			res.Status = k.ValueInt()
+			res.Status = entry.ValueInt()
 		case "headers":
-			currK := k
+			currK := entry
 			borrowed = append(borrowed, currK)
 			res.Headers = currK.ValueBytes()
-			k = encoding.AcquireKVEntry()
+			if currK == k {
+				k = encoding.AcquireKVEntry()
+			}
 		case "body":
-			currK := k
+			currK := entry
 			borrowed = append(borrowed, currK)
 			res.Body = currK.ValueBytes()
-			k = encoding.AcquireKVEntry()
+			if currK == k {
+				k = encoding.AcquireKVEntry()
+			}
 		case "exportRuleIDs":
-			res.ExportRuleIDs = k.ValueBool()
+			res.ExportRuleIDs = entry.ValueBool()
 		case "detect-only":
-			res.DetectOnly = k.ValueBool()
+			res.DetectOnly = entry.ValueBool()
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
