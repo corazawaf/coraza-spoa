@@ -97,9 +97,8 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	if isResponse && !k.NameEquals("app") {
 		a.mtx.RLock()
 		app = a.DefaultApplication
-		if app == nil && len(a.Applications) == 1 {
-			for _, app = range a.Applications {
-			}
+		if app == nil {
+			app = singleApplication(a.Applications)
 		}
 		a.mtx.RUnlock()
 		if app == nil {
@@ -151,4 +150,14 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 
 	// If the error is not an ErrInterrupted, we panic to let the spop stream fail.
 	a.Logger.Panic().Err(err).Msg("Error handling request")
+}
+
+func singleApplication(apps map[string]*Application) *Application {
+	if len(apps) != 1 {
+		return nil
+	}
+	for _, app := range apps {
+		return app
+	}
+	return nil
 }
