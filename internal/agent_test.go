@@ -41,7 +41,7 @@ func buildMessage(t *testing.T, name string, writeKV func(*encoding.KVWriter) er
 
 func TestAgentHandleSPOA_ResponseWithoutApp_DoesNotPanic(t *testing.T) {
 	app := newTestApp(t)
-	tx := app.waf.NewTransactionWithID("response-no-app")
+	tx := app.waf.NewTransactionWithID("test-response-without-app-kv")
 	app.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, 10*time.Second)
 
 	a := &Agent{

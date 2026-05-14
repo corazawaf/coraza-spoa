@@ -105,7 +105,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		}
 		a.mtx.RUnlock()
 		if app == nil {
-			a.Logger.Panic().Str("expected", "app").Str("got", string(k.NameBytes())).Msg("response message missing app and no default application configured")
+			a.Logger.Panic().Str("expected", "app").Str("got", string(k.NameBytes())).Msg("response message missing app and no fallback application available")
 			return
 		}
 
