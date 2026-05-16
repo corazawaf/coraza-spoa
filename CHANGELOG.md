@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/corazawaf/coraza-spoa/compare/v0.7.1...v0.7.2) (2026-05-16)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/fsnotify/fsnotify to v1.10.0 in go.mod ([#369](https://github.com/corazawaf/coraza-spoa/issues/369)) ([2a3cfd7](https://github.com/corazawaf/coraza-spoa/commit/2a3cfd7d4f9bda86bf0933b542124da4c2a49dce))
+
 ## [0.7.1](https://github.com/corazawaf/coraza-spoa/compare/v0.7.0...v0.7.1) (2026-05-08)
 
 
