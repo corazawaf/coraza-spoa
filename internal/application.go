@@ -162,7 +162,11 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		}
 	}()
 
-	defer exportWAFMetrics(writer, tx, req.ExportRuleIDs)
+	// final=true means no response phase will follow, which avoids Prometheus
+	// double-counting when ResponseCheck is on.
+	defer func() {
+		_ = exportWAFMetrics(writer, tx, req.ExportRuleIDs, err != nil || !a.ResponseCheck)
+	}()
 
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
@@ -354,6 +358,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			a.asyncMu.Unlock()
 			// Shutdown in progress; fall back to synchronous evaluation.
 			defer closeTx()
+			defer exportWAFMetrics(writer, tx, res.ExportRuleIDs, true)
 			return process(res.Headers, res.Body)
 		}
 		a.asyncWg.Add(1)
@@ -376,6 +381,9 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 				}
 			}()
 			defer closeTx()
+			// Writer-less: HandleResponse has returned and the SPOE writer
+			// is no longer valid. Records Prometheus only.
+			defer exportWAFMetrics(nil, tx, false, true)
 
 			if err := process(headers, body); err != nil {
 				a.Logger.Debug().Str("tx", tx.ID()).Err(err).Msg("detect-only: evaluation error")
@@ -385,7 +393,8 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}
 
 	defer closeTx()
-	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs)
+	// Response phase is always final - owns the Prometheus updates.
+	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs, true)
 	return process(res.Headers, res.Body)
 }
 
@@ -424,6 +433,11 @@ func (a AppConfig) NewApplication() (*Application, error) {
 			a.Logger.Info().Str("tx", t.tx.ID()).Msg("eviction called on currently used transaction")
 			return
 		}
+
+		// Response phase never arrived (backend error, client disconnect).
+		// The SPOE writer is long gone; record request-phase observations
+		// so orphans aren't silently dropped from Prometheus.
+		_ = exportWAFMetrics(nil, t.tx, false, true)
 
 		// Process Logging won't do anything if TX was already logged.
 		t.tx.ProcessLogging()
@@ -549,10 +563,19 @@ func isAttackRule(ruleID int) bool {
 	return isFTWAttack || isCustomAttack
 }
 
-func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, exportRuleIDs bool) error {
+// exportWAFMetrics records the WAF results for tx.
+//
+// writer: if non-nil, pushes rules_hit / anomaly_score / (rule_ids) to
+// HAProxy. Nil outside an active SPOE exchange (TTL-eviction of an orphan
+// ResponseCheck transaction).
+//
+// final: if true, also updates Prometheus. Must be true at most once per
+// transaction - tx.MatchedRules() is cumulative across phases, so counting
+// on every call under ResponseCheck would double-count.
+func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, exportRuleIDs bool, final bool) error {
 	matchedRules := tx.MatchedRules()
 	var ids []string
-	if exportRuleIDs {
+	if writer != nil && exportRuleIDs {
 		ids = make([]string, 0, len(matchedRules))
 	}
 	var count int64
@@ -566,13 +589,19 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, expor
 			continue
 		}
 
-		if exportRuleIDs {
+		if final {
+			ruleTriggersTotal.WithLabelValues(strconv.Itoa(mr.Rule().ID()), mr.Rule().Severity().String()).Inc()
+		}
+
+		if writer != nil && exportRuleIDs {
 			ids = append(ids, strconv.Itoa(mr.Rule().ID()))
 		}
 		count++
 	}
-	if err := writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count); err != nil {
-		return err
+	if writer != nil {
+		if err := writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count); err != nil {
+			return err
+		}
 	}
 
 	if txState, ok := tx.(plugintypes.TransactionState); ok {
@@ -585,13 +614,18 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, expor
 			}
 			score = v
 		}
-		if err := writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", score); err != nil {
-			return err
+		if final {
+			anomalyScore.Observe(float64(score))
 		}
-
-		if exportRuleIDs {
-			if err := writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ",")); err != nil {
+		if writer != nil {
+			if err := writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", score); err != nil {
 				return err
+			}
+
+			if exportRuleIDs {
+				if err := writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ",")); err != nil {
+					return err
+				}
 			}
 		}
 	}
