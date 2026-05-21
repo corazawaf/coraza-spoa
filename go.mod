@@ -6,7 +6,7 @@ require (
 	github.com/corazawaf/coraza-coreruleset/v4 v4.25.0
 	github.com/corazawaf/coraza/v3 v3.7.0
 	github.com/dropmorepackets/haproxy-go v0.0.8
-	github.com/fsnotify/fsnotify v1.10.0
+	github.com/fsnotify/fsnotify v1.10.1
 	github.com/jcchavezs/mergefs v0.1.1
 	github.com/magefile/mage v1.17.2
 	github.com/mccutchen/go-httpbin/v2 v2.22.1
