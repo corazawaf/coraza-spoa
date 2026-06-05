@@ -18,6 +18,8 @@ import (
 //	190001: attack range, denies /attack.
 //	190050: attack range, passes /probe (rule_triggers without disrupting).
 //	150001: outside attack range, passes /noisy (must be filtered out).
+//	190060: attack range, bumps blocking_inbound_anomaly_score to 3 on
+//	        /suspicious (below default CRS threshold of 5, so not blocked).
 const testDirectives = `
 SecRuleEngine On
 SecRequestBodyAccess On
@@ -25,6 +27,7 @@ SecResponseBodyAccess On
 SecRule REQUEST_URI "@contains /attack" "id:190001,phase:1,deny,severity:CRITICAL,msg:'test attack'"
 SecRule REQUEST_URI "@contains /probe" "id:190050,phase:1,pass,severity:WARNING,msg:'test probe'"
 SecRule REQUEST_URI "@contains /noisy" "id:150001,phase:1,pass,severity:WARNING,msg:'test noise'"
+SecRule REQUEST_URI "@contains /suspicious" "id:190060,phase:1,pass,severity:WARNING,msg:'test suspicious',setvar:'tx.blocking_inbound_anomaly_score=+3'"
 `
 
 func newAgentForMetrics(t *testing.T, responseCheck bool) *Agent {
@@ -324,6 +327,25 @@ func TestHandleSPOEDuration_ObservedOnUnknownMessage(t *testing.T) {
 	sendSPOE(t, a, msg)
 	if got := histogramSampleCount(t, handleSPOEDuration) - before; got != 1 {
 		t.Fatalf("expected +1 even on unknown message, got %d", got)
+	}
+}
+
+func TestSuspiciousRequestsTotal_IncrementedBelowThreshold(t *testing.T) {
+	a := newAgentForMetrics(t, false)
+	before := testutil.ToFloat64(suspiciousRequestsTotal)
+
+	// /suspicious bumps the score to 3 (< default threshold 5) and does not
+	// interrupt: exactly the "WAF saw something but let it through" case.
+	sendSPOE(t, a, reqMessage(t, "sample_app", "/suspicious", "tx-susp-1"))
+	if got := testutil.ToFloat64(suspiciousRequestsTotal) - before; got != 1 {
+		t.Fatalf("expected +1 on sub-threshold scored request, got %v", got)
+	}
+
+	// Clean and blocked requests must not increment the counter.
+	sendSPOE(t, a, reqMessage(t, "sample_app", "/clean", "tx-susp-2"))
+	sendSPOE(t, a, reqMessage(t, "sample_app", "/attack", "tx-susp-3"))
+	if got := testutil.ToFloat64(suspiciousRequestsTotal) - before; got != 1 {
+		t.Fatalf("clean/blocked requests must not increment, got %v", got)
 	}
 }
 

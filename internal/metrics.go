@@ -42,4 +42,13 @@ var (
 			Buckets: []float64{0, 3, 5, 7, 10, 15, 25, 50, 100},
 		},
 	)
+
+	// Counts requests let through despite triggering at least one scored rule.
+	// (score > 0 and < tx.inbound_anomaly_score_threshold).
+	suspiciousRequestsTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "coraza_suspicious_requests_total",
+			Help: "Requests with non-zero anomaly score below the CRS blocking threshold (suspicious but not blocked)",
+		},
+	)
 )

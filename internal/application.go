@@ -616,6 +616,19 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, expor
 		}
 		if final {
 			anomalyScore.Observe(float64(score))
+			// "Suspicious but unblocked"
+			// tx.Interruption() filters out request-phase blocks (which can also have score > 0 after rule 949110 fires).
+			if score > 0 && tx.Interruption() == nil {
+				threshold := int64(5)
+				if t := txState.Variables().TX().Get("inbound_anomaly_score_threshold"); len(t) > 0 {
+					if v, err := strconv.ParseInt(t[0], 10, 64); err == nil {
+						threshold = v
+					}
+				}
+				if score < threshold {
+					suspiciousRequestsTotal.Inc()
+				}
+			}
 		}
 		if writer != nil {
 			if err := writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", score); err != nil {
