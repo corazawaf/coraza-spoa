@@ -96,6 +96,11 @@ func main() {
 	defer cancelFunc()
 
 	network, address := cfg.networkAddressFromBind()
+	if network == "unix" {
+		if err := os.Remove(address); err != nil && !os.IsNotExist(err) {
+			globalLogger.Fatal().Err(err).Msg("Failed removing stale unix socket")
+		}
+	}
 	l, err := (&net.ListenConfig{}).Listen(ctx, network, address)
 	if err != nil {
 		globalLogger.Fatal().Err(err).Msg("Failed opening socket")
