@@ -97,9 +97,19 @@ func main() {
 
 	network, address := cfg.networkAddressFromBind()
 	if network == "unix" {
-		if err := os.Remove(address); err != nil && !os.IsNotExist(err) {
-			globalLogger.Fatal().Err(err).Msg("Failed removing stale unix socket")
+		if fi, err := os.Lstat(address); err == nil {
+			if fi.Mode()&os.ModeSocket == 0 {
+				globalLogger.Fatal().
+					Str("path", address).
+					Msg("Refusing to remove non-socket bind path")
+			}
+			if err := os.Remove(address); err != nil {
+				globalLogger.Fatal().Err(err).Msg("Failed removing stale unix socket")
+			}
+		} else if !os.IsNotExist(err) {
+			globalLogger.Fatal().Err(err).Msg("Failed checking unix socket path")
 		}
+	}
 	}
 	l, err := (&net.ListenConfig{}).Listen(ctx, network, address)
 	if err != nil {
