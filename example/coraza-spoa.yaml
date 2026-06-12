@@ -1,4 +1,6 @@
 # The SPOA server bind address
+# TCP:         bind: 0.0.0.0:9000
+# Unix socket: bind: unix:///var/run/coraza-spoa.sock
 bind: 0.0.0.0:9000
 
 # The log level configuration, one of: debug/info/warn/error/panic/fatal
