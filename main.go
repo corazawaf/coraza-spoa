@@ -80,7 +80,13 @@ func main() {
 	if err != nil {
 		globalLogger.Fatal().Err(err).Msg("Failed creating global logger")
 	}
-	globalLogger = logger
+	// In validate mode keep logging on stderr so parse/compile errors reach
+	// the caller instead of disappearing into the configured log file. The
+	// configured logger is still created above so bad log settings fail
+	// validation too.
+	if !validateConfig {
+		globalLogger = logger
+	}
 
 	apps, err := cfg.newApplications()
 	if err != nil {

@@ -153,10 +153,10 @@ func (c *config) watchConfig(a *internal.Agent) error {
 func (c config) newApplications() (map[string]*internal.Application, error) {
 	allApps := make(map[string]*internal.Application)
 
-	for name, a := range c.Applications {
+	for _, a := range c.Applications {
 		logger, err := a.Log.newLogger()
 		if err != nil {
-			return nil, fmt.Errorf("creating logger for application %q: %v", name, err)
+			return nil, fmt.Errorf("creating logger for application %q: %v", a.Name, err)
 		}
 
 		appConfig := internal.AppConfig{
@@ -169,7 +169,7 @@ func (c config) newApplications() (map[string]*internal.Application, error) {
 
 		application, err := appConfig.NewApplication()
 		if err != nil {
-			return nil, fmt.Errorf("initializing application %q: %v", name, err)
+			return nil, fmt.Errorf("initializing application %q: %v", a.Name, err)
 		}
 
 		allApps[a.Name] = application
