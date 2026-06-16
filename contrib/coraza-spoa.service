@@ -10,6 +10,11 @@ Type=exec
 User=coraza-spoa
 Group=coraza-spoa
 
+# Creates and owns /run/coraza-spoa (cleaned up on stop), so a unix-socket
+# bind such as `bind: unix:///run/coraza-spoa/coraza-spoa.sock` has a writable
+# parent directory.
+RuntimeDirectory=coraza-spoa
+
 # Hardening
 AmbientCapabilities=
 MountFlags=private
@@ -293,7 +298,7 @@ PrivateTmp=true
 
 RemoveIPC=true
 
-RestrictAddressFamilies=AF_INET AF_INET6
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 #RestrictNamespaces=uts ipc pid user cgroup
 
 SystemCallArchitectures=native
