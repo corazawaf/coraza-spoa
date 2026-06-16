@@ -110,7 +110,6 @@ func main() {
 			globalLogger.Fatal().Err(err).Msg("Failed checking unix socket path")
 		}
 	}
-	}
 	l, err := (&net.ListenConfig{}).Listen(ctx, network, address)
 	if err != nil {
 		globalLogger.Fatal().Err(err).Msg("Failed opening socket")
