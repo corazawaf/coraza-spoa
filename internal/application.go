@@ -33,11 +33,13 @@ type AppConfig struct {
 }
 
 type Application struct {
-	waf     coraza.WAF
-	cache   *ttlCache
-	asyncWg sync.WaitGroup
-	asyncMu sync.Mutex
+	waf      coraza.WAF
+	cache    *ttlCache
+	asyncWg  sync.WaitGroup
+	asyncMu  sync.Mutex
 	draining bool
+	hosts    map[string]string
+	hostsMu  sync.RWMutex
 
 	AppConfig
 }
@@ -160,6 +162,9 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		if err := tx.Close(); err != nil {
 			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
 		}
+		a.hostsMu.Lock()
+		delete(a.hosts, tx.ID())
+		a.hostsMu.Unlock()
 	}()
 
 	defer exportWAFMetrics(writer, tx, req.ExportRuleIDs)
@@ -186,9 +191,13 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		tx.ProcessURI(url.String(), req.Method, "HTTP/"+req.Version)
 	}
 
-	if err := readHeaders(req.Headers, tx.AddRequestHeader, tx.SetServerName); err != nil {
+	host, err := readHeaders(req.Headers, tx.AddRequestHeader, tx.SetServerName)
+	if err != nil {
 		return fmt.Errorf("reading headers: %v", err)
 	}
+	a.hostsMu.Lock()
+	a.hosts[tx.ID()] = host
+	a.hostsMu.Unlock()
 
 	if it := tx.ProcessRequestHeaders(); it != nil {
 		return ErrInterrupted{it}
@@ -211,7 +220,8 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 	return nil
 }
 
-func readHeaders(headers []byte, hdrCallback func(key string, value string), hostCallback func(value string)) error {
+func readHeaders(headers []byte, hdrCallback func(key string, value string), hostCallback func(value string)) (string, error) {
+	var host string
 	s := bufio.NewScanner(bytes.NewReader(headers))
 	for s.Scan() {
 		line := bytes.TrimSpace(s.Bytes())
@@ -221,19 +231,20 @@ func readHeaders(headers []byte, hdrCallback func(key string, value string), hos
 
 		kv := bytes.SplitN(line, []byte(":"), 2)
 		if len(kv) != 2 {
-			return fmt.Errorf("invalid header: %q", s.Text())
+			return "", fmt.Errorf("invalid header: %q", s.Text())
 		}
 
 		key, value := bytes.TrimSpace(kv[0]), bytes.TrimSpace(kv[1])
 
 		if hostCallback != nil && string(key) == "host" {
 			hostCallback(string(value))
+			host = string(value)
 		}
 
 		hdrCallback(string(key), string(value))
 	}
 
-	return nil
+	return host, nil
 }
 
 type applicationResponse struct {
@@ -314,7 +325,8 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			return nil
 		}
 
-		if err := readHeaders(headers, tx.AddResponseHeader, nil); err != nil {
+		_, err := readHeaders(headers, tx.AddResponseHeader, nil)
+		if err != nil {
 			return fmt.Errorf("reading headers: %v", err)
 		}
 
@@ -341,6 +353,9 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 
 	closeTx := func() {
 		tx.ProcessLogging()
+		a.hostsMu.Lock()
+		delete(a.hosts, tx.ID())
+		a.hostsMu.Unlock()
 		if err := tx.Close(); err != nil {
 			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
 		}
@@ -413,6 +428,7 @@ func (a AppConfig) NewApplication() (*Application, error) {
 		return nil, err
 	}
 	app.waf = waf
+	app.hosts = make(map[string]string)
 
 	const defaultEvictionInterval = time.Second * 1
 
@@ -427,6 +443,9 @@ func (a AppConfig) NewApplication() (*Application, error) {
 
 		// Process Logging won't do anything if TX was already logged.
 		t.tx.ProcessLogging()
+		app.hostsMu.Lock()
+		delete(app.hosts, t.tx.ID())
+		app.hostsMu.Unlock()
 		if err := t.tx.Close(); err != nil {
 			a.Logger.Error().Err(err).Str("tx", t.tx.ID()).Msg("error closing transaction")
 		}
@@ -435,7 +454,7 @@ func (a AppConfig) NewApplication() (*Application, error) {
 	return &app, nil
 }
 
-func matchedRuleErrorJson(mr types.MatchedRule) []byte {
+func matchedRuleErrorJson(mr types.MatchedRule, host string) []byte {
 	type errorLog struct {
 		Client     string   `json:"client"`
 		File       string   `json:"file"`
@@ -451,6 +470,7 @@ func matchedRuleErrorJson(mr types.MatchedRule) []byte {
 		Accuracy   int      `json:"accuracy"`
 		Tags       []string `json:"tags"`
 		Server     string   `json:"server"`
+		Host       string   `json:"host"`
 		URI        string   `json:"uri"`
 		UniqueID   string   `json:"unique_id"`
 		Disruptive bool     `json:"disruptive"`
@@ -474,6 +494,7 @@ func matchedRuleErrorJson(mr types.MatchedRule) []byte {
 		Data:       mr.Data(),
 		Client:     mr.ClientIPAddress(),
 		Server:     mr.ServerIPAddress(),
+		Host:       host,
 		Disruptive: mr.Disruptive(),
 		URI:        mr.URI(),
 		UniqueID:   mr.TransactionID(),
@@ -514,11 +535,20 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	default:
 		l = a.Logger.Error()
 	}
+
+	a.hostsMu.RLock()
+	host := a.hosts[mr.TransactionID()]
+	a.hostsMu.RUnlock()
+
 	switch a.LogFormat {
 	case "json":
-		l.RawJSON("match", matchedRuleErrorJson(mr)).Send()
+		l.RawJSON("match", matchedRuleErrorJson(mr, host)).Send()
 	default:
-		l.Msg(mr.ErrorLog())
+		msg := mr.ErrorLog()
+		if host != "" {
+			msg = msg + ` [host "` + host + `"]`
+		}
+		l.Msg(msg)
 	}
 }
 
