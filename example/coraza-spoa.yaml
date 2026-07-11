@@ -1,13 +1,4 @@
-# The SPOA server bind address
-# TCP:         bind: 0.0.0.0:9000
-# Unix socket: bind: unix:///run/coraza-spoa/coraza-spoa.sock
-#
-# When running under the hardened systemd unit (contrib/coraza-spoa.service),
-# put the socket under /run/coraza-spoa/ — that directory is created and made
-# writable by `RuntimeDirectory=coraza-spoa`, and its name must match the
-# RuntimeDirectory value. Paths under /var/run won't work: the unit mounts an
-# empty tmpfs over /var (TemporaryFileSystem=/var), so the /var/run -> /run
-# symlink is hidden inside the sandbox.
+# The SPOA server bind address, either TCP (0.0.0.0:9000) or a Unix socket (unix:///run/coraza-spoa/coraza-spoa.sock; under the hardened systemd unit the path must be within RuntimeDirectory, e.g. /run/coraza-spoa/).
 bind: 0.0.0.0:9000
 
 # The log level configuration, one of: debug/info/warn/error/panic/fatal
