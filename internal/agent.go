@@ -18,6 +18,11 @@ type Agent struct {
 	Applications       map[string]*Application
 	Logger             zerolog.Logger
 
+	// defaultApplicationName caches the map key under which DefaultApplication
+	// is stored in Applications. Maintained by ReplaceApplications so the hot
+	// path in HandleSPOE can label the fallback-verdict metric in O(1).
+	defaultApplicationName string
+
 	mtx sync.RWMutex
 }
 
@@ -30,9 +35,20 @@ func (a *Agent) Serve(l net.Listener) error {
 	return agent.Serve(l)
 }
 
-func (a *Agent) ReplaceApplications(newApps map[string]*Application) {
+func (a *Agent) ReplaceApplications(newApps map[string]*Application, defaultApp *Application) {
+	var defaultName string
+	if defaultApp != nil {
+		for name, app := range newApps {
+			if app == defaultApp {
+				defaultName = name
+				break
+			}
+		}
+	}
 	a.mtx.Lock()
 	a.Applications = newApps
+	a.DefaultApplication = defaultApp
+	a.defaultApplicationName = defaultName
 	a.mtx.Unlock()
 }
 
@@ -68,11 +84,13 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	)
 
 	var messageHandler func(*Application, context.Context, *encoding.ActionWriter, *encoding.Message) error
+	var isResponsePhase bool
 	switch name := string(message.NameBytes()); name {
 	case messageCorazaRequest:
 		messageHandler = (*Application).HandleRequest
 	case messageCorazaResponse:
 		messageHandler = (*Application).HandleResponse
+		isResponsePhase = true
 	default:
 		a.Logger.Debug().Str("message", name).Msg("unknown spoe message")
 		return
@@ -93,28 +111,42 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		return
 	}
 
+	// On fallback, label with the default's name (cached in ReplaceApplications)
+	// to bound cardinality even when HAProxy sends unbounded values (e.g.
+	// hdr(host)).
 	a.mtx.RLock()
 	app := a.Applications[appName]
-	a.mtx.RUnlock()
-	if app == nil && a.DefaultApplication != nil {
-		// If we cannot resolve the app but the default app is configured,
-		// we use the latter to process the request.
-		app = a.DefaultApplication
+	defaultApp := a.DefaultApplication
+	metricApp := appName
+	if app == nil && defaultApp != nil {
+		app = defaultApp
+		metricApp = a.defaultApplicationName
 		a.Logger.Debug().Str("app", appName).Msg("app not found, using default app")
 	}
+	a.mtx.RUnlock()
 	if app == nil {
-		// If we cannot resolve the app, we fail as this is an invalid configuration.
 		a.Logger.Panic().Str("app", appName).Msg("app not found")
 		return
 	}
 
+	// Verdict is final on response phase, or on request phase when
+	// ResponseCheck is off. Keeps coraza_actions_total at one increment
+	// per request rather than two.
+	isFinalPhase := isResponsePhase || !app.ResponseCheck
+
 	err := messageHandler(app, ctx, writer, message)
 	if err == nil {
+		if isFinalPhase {
+			actionsTotal.WithLabelValues("allow", metricApp).Inc()
+		}
 		return
 	}
 
 	var interruption ErrInterrupted
 	if err != nil && errors.As(err, &interruption) {
+		// Interruption ends the transaction (no response phase), so it is
+		// always the final verdict.
+		actionsTotal.WithLabelValues(interruption.Interruption.Action, metricApp).Inc()
 		_ = writer.SetInt64(encoding.VarScopeTransaction, "status", int64(interruption.Interruption.Status))
 		_ = writer.SetString(encoding.VarScopeTransaction, "action", interruption.Interruption.Action)
 		_ = writer.SetString(encoding.VarScopeTransaction, "data", interruption.Interruption.Data)

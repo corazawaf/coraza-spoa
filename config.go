@@ -96,7 +96,7 @@ func (c *config) reloadConfig(a *internal.Agent) (*config, error) {
 		return nil, fmt.Errorf("error applying configuration: %w", err)
 	}
 
-	a.ReplaceApplications(apps)
+	a.ReplaceApplications(apps, apps[newCfg.DefaultApplication])
 	globalLogger.Info().Msg("Configuration successfully reloaded")
 	return newCfg, nil
 }

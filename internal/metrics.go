@@ -13,4 +13,42 @@ var (
 			Buckets: prometheus.DefBuckets,
 		},
 	)
+
+	// action: interruption verdict (deny/drop/redirect) or "allow".
+	// application: requested SPOE "app" arg, or default_application's name
+	// when fallback handles an unknown app. Bounded by applications[].name.
+	actionsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "coraza_actions_total",
+			Help: "Total number of WAF verdicts by action and application",
+		},
+		[]string{"action", "application"},
+	)
+
+	// rule_id: CRS attack ranges only (isAttackRule); ~400 IDs in CRS v4.
+	// severity: types.RuleSeverity.String() - 9-value enum.
+	ruleTriggersTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "coraza_rule_triggers_total",
+			Help: "Total number of CRS attack-rule matches by rule ID and severity",
+		},
+		[]string{"rule_id", "severity"},
+	)
+
+	anomalyScore = promauto.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "coraza_anomaly_score",
+			Help:    "Distribution of CRS blocking inbound anomaly scores",
+			Buckets: []float64{0, 3, 5, 7, 10, 15, 25, 50, 100},
+		},
+	)
+
+	// Counts requests let through despite triggering at least one scored rule.
+	// (score > 0 and < tx.inbound_anomaly_score_threshold).
+	suspiciousRequestsTotal = promauto.NewCounter(
+		prometheus.CounterOpts{
+			Name: "coraza_suspicious_requests_total",
+			Help: "Requests with non-zero anomaly score below the CRS blocking threshold (suspicious but not blocked)",
+		},
+	)
 )
