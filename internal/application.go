@@ -516,7 +516,7 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	// Record metrics for matched rules
 	
 	// Increment counter by severity if severity is valid
-	if severity := rule.Severity(); severity != 0 {
+	if severity := rule.Severity(); severity.String() != "" {
 		severityStr := severity.String()
 		if severityStr != "" {
 			handleResponsesBySeverity.WithLabelValues(severityStr).Inc()
