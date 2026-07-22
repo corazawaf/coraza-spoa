@@ -61,6 +61,9 @@ func (a *Agent) DrainDetectOnly() {
 func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) {
 	timer := prometheus.NewTimer(handleSPOEDuration)
 	defer timer.ObserveDuration()
+	
+	// Increment request counter
+	handleSPOECount.Inc()
 
 	const (
 		messageCorazaRequest  = "coraza-req"
