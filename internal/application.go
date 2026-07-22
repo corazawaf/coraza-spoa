@@ -516,15 +516,14 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	// Record metrics for matched rules
 	
 	// Increment counter by severity if severity is valid
-	if severity := rule.Severity(); severity.String() != "" {
-		severityStr := severity.String()
-		if severityStr != "" {
-			handleResponsesBySeverity.WithLabelValues(severityStr).Inc()
-		} else {
-			a.Logger.Debug().Int("severity", severity.Int()).Msg("invalid severity in logCallback")
-		}
+	severity := rule.Severity()
+	severityStr := severity.String()
+	if severityStr != "" {
+		handleResponsesBySeverity.WithLabelValues(severityStr).Inc()
+	} else {
+		a.Logger.Debug().Int("severity", severity.Int()).Msg("invalid severity in logCallback")
 	}
-	
+		
 	// Increment counter by rule if ID is valid (> 0)
 	if ruleID := rule.ID(); ruleID > 0 {
 		ruleIDStr := strconv.Itoa(ruleID)
