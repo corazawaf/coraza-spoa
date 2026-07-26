@@ -19,6 +19,8 @@ github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dropmorepackets/haproxy-go v0.0.8 h1:kS2Wa8+ZDcnJdRSTiuBsaPun5hpdUPIuLQ+Drp9ZxYs=
 github.com/dropmorepackets/haproxy-go v0.0.8/go.mod h1:4a2AmmVjvg2zPNdizGZrMN8ZSUpj90U43VlcdbOIBnU=
+github.com/dropmorepackets/haproxy-go v0.1.1 h1:qYovzYpGHanQCBQW5k92uJqIdjcwSJQHZ0VFRiI3FJ0=
+github.com/dropmorepackets/haproxy-go v0.1.1/go.mod h1:4a2AmmVjvg2zPNdizGZrMN8ZSUpj90U43VlcdbOIBnU=
 github.com/foxcpp/go-mockdns v1.1.0 h1:jI0rD8M0wuYAxL7r/ynTrCQQq0BVqfB99Vgk7DlmewI=
 github.com/foxcpp/go-mockdns v1.1.0/go.mod h1:IhLeSFGed3mJIAXPH2aiRQB+kqz7oqu8ld2qVbOu7Wk=
 github.com/fsnotify/fsnotify v1.9.0 h1:2Ml+OJNzbYCTzsxtv8vKSFD9PbJjmhYF14k/jKC7S9k=
@@ -66,6 +68,8 @@ github.com/mccutchen/go-httpbin/v2 v2.22.0 h1:VX7gXFcqJJdxdZGHGjsZcPi/Gh7FXp25t5
 github.com/mccutchen/go-httpbin/v2 v2.22.0/go.mod h1:8hkN5rHf0QvJYEovZ8u/Dudtqyj6Z5gxQaW7scQfT0Y=
 github.com/mccutchen/go-httpbin/v2 v2.22.1 h1:dPXXDER9uwlXrIJ+JtvY88ArFe7twHUMp0i2xmT8vvQ=
 github.com/mccutchen/go-httpbin/v2 v2.22.1/go.mod h1:8hkN5rHf0QvJYEovZ8u/Dudtqyj6Z5gxQaW7scQfT0Y=
+github.com/mccutchen/go-httpbin/v2 v2.23.1 h1:F/05blJUzgTVTBd5bUW0cstUXnqnv5KIetb6uBciyG4=
+github.com/mccutchen/go-httpbin/v2 v2.23.1/go.mod h1:8hkN5rHf0QvJYEovZ8u/Dudtqyj6Z5gxQaW7scQfT0Y=
 github.com/miekg/dns v1.1.58 h1:ca2Hdkz+cDg/7eNF6V56jjzuZ4aCAE+DbVkILdQWG/4=
 github.com/miekg/dns v1.1.58/go.mod h1:Ypv+3b/KadlvW9vJfXOTf300O4UqaHFzFCuHz+rPkBY=
 github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 h1:C3w9PqII01/Oq1c1nUAm88MOHcQC9l5mIlSMApZMrHA=
