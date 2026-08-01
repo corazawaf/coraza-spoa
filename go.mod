@@ -9,7 +9,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/jcchavezs/mergefs v0.1.1
 	github.com/magefile/mage v1.17.2
-	github.com/mccutchen/go-httpbin/v2 v2.23.1
+	github.com/mccutchen/go-httpbin/v2 v2.24.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
 	gopkg.in/yaml.v3 v3.0.1
