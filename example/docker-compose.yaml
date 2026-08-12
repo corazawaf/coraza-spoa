@@ -1,7 +1,7 @@
 version: "3.9"
 services:
   httpbin:
-    image: mccutchen/go-httpbin:2.24.0@sha256:c0bf25bcde7329ba1d07aa372bc1f6ad33608ab1a8b40870769b9d99aa466c5c
+    image: mccutchen/go-httpbin:2.25.0@sha256:20739736d4eb8dc1b998dff701f437b8bd62dcc46492bd0d861e89890ca36500
     environment:
       - MAX_BODY_SIZE=15728640 # 15 MiB
     command: [ "/bin/go-httpbin", "-port", "8081" ]
