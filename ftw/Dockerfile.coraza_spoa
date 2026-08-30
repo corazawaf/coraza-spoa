@@ -11,7 +11,7 @@ RUN go vet -v ./...
 
 RUN CGO_ENABLED=0 go build -o /go/bin/coraza-spoa
 
-FROM gcr.io/distroless/static-debian12@sha256:20bc6c0bc4d625a22a8fde3e55f6515709b32055ef8fb9cfbddaa06d1760f838
+FROM gcr.io/distroless/static-debian13@sha256:f2ea2709ac8db56323cbd7d014277f32cb572d9ea124b0076f7aafe5980678fe
 
 LABEL org.opencontainers.image.authors="The OWASP Coraza contributors" \
       org.opencontainers.image.description="OWASP Coraza WAF (Haproxy SPOA)" \
