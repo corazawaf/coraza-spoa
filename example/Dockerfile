@@ -1,7 +1,7 @@
 # Copyright 2023 The OWASP Coraza contributors
 # SPDX-License-Identifier: Apache-2.0
 
-FROM golang:1.25@sha256:dfae680962532eeea67ab297f1166c2c4e686edb9a8f05f9d02d96fc9191833e AS build
+FROM golang:1.25@sha256:9006890ecba0a168034d99516084099ae3114d9f2b7d6572c77f2dde57ebc980 AS build
 
 WORKDIR /go/src/app
 COPY . .
@@ -11,7 +11,7 @@ RUN go vet -v ./...
 
 RUN CGO_ENABLED=0 go build -o /go/bin/coraza-spoa
 
-FROM gcr.io/distroless/static-debian11@sha256:1dbe426d60caed5d19597532a2d74c8056cd7b1674042b88f7328690b5ead8ed
+FROM gcr.io/distroless/static-debian13@sha256:f2ea2709ac8db56323cbd7d014277f32cb572d9ea124b0076f7aafe5980678fe
 
 LABEL org.opencontainers.image.authors="The OWASP Coraza contributors" \
       org.opencontainers.image.description="OWASP Coraza WAF (Haproxy SPOA)" \
