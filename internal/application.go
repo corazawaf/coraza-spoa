@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"runtime/debug"
@@ -60,6 +61,7 @@ type applicationRequest struct {
 	Headers       []byte
 	Body          []byte
 	ExportRuleIDs bool
+	DetectOnly    bool
 }
 
 func (a *Application) HandleRequest(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
@@ -133,6 +135,8 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 			req.ID = string(k.ValueBytes())
 		case "exportRuleIDs":
 			req.ExportRuleIDs = k.ValueBool()
+		case "detect-only":
+			req.DetectOnly = k.ValueBool()
 		default:
 			a.Logger.Debug().Str("name", name).Msg("unknown kv entry")
 		}
@@ -151,9 +155,28 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 
 	tx := a.waf.NewTransactionWithID(req.ID)
 	defer func() {
-		if err == nil && a.ResponseCheck {
-			a.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, a.TransactionTTL)
-			return
+		// Cache the transaction for response-phase correlation when response
+		// checking is enabled and either:
+		//   - the request passed cleanly (err == nil), or
+		//   - we are in detect-only mode and the request raised an interruption.
+		//
+		// In detect-only mode HAProxy does NOT enforce the interruption: it
+		// forwards the request to the origin anyway, so a response will still
+		// arrive over coraza-res and must be correlated to this transaction.
+		// The transaction's lifecycle therefore extends to the response phase,
+		// exactly like a non-interrupted request. Without caching it here,
+		// HandleResponse would fail to find it and the response (and its
+		// logging / inspection) would be lost.
+		//
+		// If the response never arrives, the TTL eviction callback closes and
+		// logs the transaction, the same safety net every cached transaction
+		// already relies on.
+		if a.ResponseCheck {
+			var interruption ErrInterrupted
+			if err == nil || (req.DetectOnly && errors.As(err, &interruption)) {
+				a.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, a.TransactionTTL)
+				return
+			}
 		}
 
 		tx.ProcessLogging()

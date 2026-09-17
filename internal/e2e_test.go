@@ -94,6 +94,35 @@ SecRuleEngine On
 		})
 	})
 
+	t.Run("request detect-only forwards and correlates response", func(t *testing.T) {
+		// Full detect-only: HAProxy does not enforce the verdict, so a request
+		// the WAF would deny is forwarded to the origin and its response
+		// returned. The interrupted request transaction must still be cached so
+		// the response can be correlated; otherwise HandleResponse fails with
+		// "transaction not found" and the request is denied with a 504.
+		config, _, _ := runCorazaRequestDetectOnly(t, defaultCorazaConfig)
+
+		req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/anything?arg=<script>alert(0)</script>", http.NoBody)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request failed: %v", err)
+		}
+		defer resp.Body.Close()
+
+		// Forwarded to the origin (httpbin /anything echoes with 200), proving
+		// the request was not blocked and the response was correlated/logged
+		// rather than lost (which would yield a 504).
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusOK, resp.StatusCode)
+		}
+
+		// The WAF still detected the malicious request (request-phase metrics
+		// are exported even when the verdict is not enforced).
+		if ruleIDs := resp.Header.Get("X-Rule-IDs"); ruleIDs == "" {
+			t.Errorf("expected rule_ids to be not empty (request should still be detected)")
+		}
+	})
+
 	t.Run("default config", func(t *testing.T) {
 		config, _, _ := runCoraza(t, defaultCorazaConfig)
 
@@ -229,6 +258,67 @@ spoe-message coraza-req
 
 spoe-message coraza-res
     args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body exportRuleIDs=bool(true)
+    event on-http-response
+`,
+		BackendConfig: fmt.Sprintf(`
+mode http
+server httpbin %s
+`, backendAddr),
+	}
+
+	frontendSocket := cfg.Run(tb)
+
+	return cfg, binURL, frontendSocket
+}
+
+// runCorazaRequestDetectOnly models full detect-only mode: HAProxy does NOT
+// enforce the WAF verdict, so requests that the WAF would deny are still
+// forwarded to the origin and their responses delivered. Both coraza-req and
+// coraza-res carry detect-only=bool(true). The only deny left is the 504 on a
+// SPOA processing error, so a failed request/response correlation (e.g. a
+// "transaction not found" because an interrupted request was not cached)
+// surfaces as a 504 instead of the expected 200.
+func runCorazaRequestDetectOnly(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
+	a, binURL, backendAddr := setupCorazaAgent(tb, directives)
+
+	// create the listener synchronously to prevent a race
+	l := testutil.TCPListener(tb)
+	// ignore errors as the listener will be closed by t.Cleanup
+	go a.Serve(l)
+
+	cfg := testutil.HAProxyConfig{
+		EngineAddr:   l.Addr().String(),
+		FrontendPort: fmt.Sprintf("%d", testutil.TCPPort(tb)),
+		CustomFrontendConfig: `
+    http-after-response set-header X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]"
+    http-after-response set-header X-Rules-Hit "%[var(txn.e2e.rules_hit)]"
+    http-after-response set-header X-Rule-IDs "%[var(txn.e2e.rule_ids)]"
+
+    # No is_deny enforcement: the WAF verdict is detected and logged but never
+    # blocks, so every request reaches the origin and every response is returned.
+
+    # Deny only when the SPOA itself errors, so a lost transaction surfaces.
+    http-request deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
+    http-response deny deny_status 504 if { var(txn.e2e.error) -m int gt 0 }
+`,
+		EngineConfig: `
+[e2e]
+spoe-agent e2e
+    messages    coraza-req     coraza-res
+    option      var-prefix      e2e
+    option      set-on-error    error
+    timeout     hello           2s
+    timeout     idle            2m
+    timeout     processing      500ms
+    use-backend e2e-spoa
+    log         global
+
+spoe-message coraza-req
+    args app=str(default) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body exportRuleIDs=bool(true) detect-only=bool(true)
+    event on-frontend-http-request
+
+spoe-message coraza-res
+    args app=str(default) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body exportRuleIDs=bool(true) detect-only=bool(true)
     event on-http-response
 `,
 		BackendConfig: fmt.Sprintf(`

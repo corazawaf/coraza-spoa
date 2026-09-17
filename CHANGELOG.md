@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.7.3](https://github.com/corazawaf/coraza-spoa/compare/v0.7.2...v0.7.3) (2026-09-01)
+
+
+### Bug Fixes
+
+* correlate response for interrupted requests in detect-only mode ([15bef59](https://github.com/corazawaf/coraza-spoa/commit/15bef596c2a3820885318f2844fbf16196d2ae90))
+* **deps:** update all non-major dependencies in .github/workflows/test.yaml ([23b65d9](https://github.com/corazawaf/coraza-spoa/commit/23b65d9949236db87c8d4a9cf5dba5e5da841b02))
+* **deps:** update all non-major dependencies to v2.24.0 in go.mod ([#387](https://github.com/corazawaf/coraza-spoa/issues/387)) ([b82567e](https://github.com/corazawaf/coraza-spoa/commit/b82567eb933a53e8fec22489e19461136991a1d8))
+* **deps:** update all non-major dependencies to v2.25.0 in go.mod ([#391](https://github.com/corazawaf/coraza-spoa/issues/391)) ([bcf87be](https://github.com/corazawaf/coraza-spoa/commit/bcf87be99ade4b7c423900976d3d3af76ee96e5b))
+* **deps:** update module github.com/fsnotify/fsnotify to v1.10.1 in go.mod ([#371](https://github.com/corazawaf/coraza-spoa/issues/371)) ([70845b1](https://github.com/corazawaf/coraza-spoa/commit/70845b1d4fb075c09d5b9da2e2d5646f0fec6b42))
+* **deps:** update module github.com/prometheus/client_golang to v1.24.0 in go.mod ([#389](https://github.com/corazawaf/coraza-spoa/issues/389)) ([472f44d](https://github.com/corazawaf/coraza-spoa/commit/472f44d3bc32ffb31713eb4a644a0b2e475d1e39))
+* **deps:** update module github.com/prometheus/client_golang to v1.24.1 in go.mod ([#390](https://github.com/corazawaf/coraza-spoa/issues/390)) ([8181ca9](https://github.com/corazawaf/coraza-spoa/commit/8181ca9429efee124b1b26bba82889b36abaa8dd))
+* support unix-socket bind under hardened systemd unit ([a8672f3](https://github.com/corazawaf/coraza-spoa/commit/a8672f356a38557869d048093761144094e1b865))
+* surface -validate errors on stderr and name the failing application ([e57ead0](https://github.com/corazawaf/coraza-spoa/commit/e57ead06702191073bf2ea9be55c38eb393cc828))
+
 ## [0.7.2](https://github.com/corazawaf/coraza-spoa/compare/v0.7.1...v0.7.2) (2026-05-16)
 
 
