@@ -528,7 +528,9 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	severity := rule.Severity()
 	handleResponsesBySeverity.WithLabelValues(severity.String()).Inc()
 	handleResponsesByRule.WithLabelValues(strconv.Itoa(rule.ID())).Inc()
-	handleVersion.WithLabelValues(rule.Version()).Set(1)
+	if version := rule.Version(); version != "" && len(version) < 256 {
+		handleVersion.WithLabelValues(version).Set(1)
+	}
 
 	var l *zerolog.Event
 
