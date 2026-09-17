@@ -14,11 +14,11 @@ var (
 		},
 	)
 
-	// Counter for the number of SPOE requests processed
+	// Counter for the number of HTTP requests processed (counted on coraza-req)
 	handleSPOECount = promauto.NewCounter(
 		prometheus.CounterOpts{
 			Name: "coraza_handle_spoe_count",
-			Help: "Total number of SPOE requests handled",
+			Help: "Total number of HTTP requests handled via coraza-req",
 		},
 	)
 
