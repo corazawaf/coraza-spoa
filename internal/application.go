@@ -524,9 +524,17 @@ func phaseToString(phase types.RulePhase) string {
 }
 
 func (a *Application) logCallback(mr types.MatchedRule) {
+	rule := mr.Rule()
+	severity := rule.Severity()
+	handleResponsesBySeverity.WithLabelValues(severity.String()).Inc()
+	handleResponsesByRule.WithLabelValues(strconv.Itoa(rule.ID())).Inc()
+	if version := rule.Version(); version != "" && len(version) < 256 {
+		handleVersion.WithLabelValues(version).Set(1)
+	}
+
 	var l *zerolog.Event
 
-	switch mr.Rule().Severity() {
+	switch rule.Severity() {
 	case types.RuleSeverityWarning:
 		l = a.Logger.Warn()
 	case types.RuleSeverityNotice,
