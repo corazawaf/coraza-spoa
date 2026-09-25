@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/corazawaf/coraza-spoa/compare/v0.7.3...v0.7.4) (2026-09-25)
+
+
+### Bug Fixes
+
+* **config:** replace the default application on reload ([464f1ae](https://github.com/corazawaf/coraza-spoa/commit/464f1aee5d55e883837487061d46b8ac1b34896b))
+
 ## [0.7.3](https://github.com/corazawaf/coraza-spoa/compare/v0.7.2...v0.7.3) (2026-09-01)
 
 
