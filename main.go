@@ -34,7 +34,6 @@ var (
 	cpuProfile     string
 	memProfile     string
 	metricsAddr    string
-	healthAddr     string
 	showVersion    bool
 	globalLogger   = zerolog.New(os.Stderr).With().Timestamp().Logger()
 )
@@ -45,8 +44,7 @@ func main() {
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
-	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics")
-	flag.StringVar(&healthAddr, "health-addr", "", "ip:port bind for health checks")
+	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics and health checks")
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
 
@@ -125,10 +123,6 @@ func main() {
 
 	if metricsAddr != "" {
 		go runMetricsServer(rootCtx, metricsAddr)
-	}
-
-	if healthAddr != "" {
-		go runHealthServer(rootCtx, healthAddr)
 	}
 
 	if autoReload {
@@ -222,6 +216,16 @@ func runAgent(ctx context.Context, cfg *config, agent *internal.Agent, rootCance
 func runMetricsServer(ctx context.Context, addr string) {
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("ok")); err != nil {
+			globalLogger.Error().Err(err).Msg("Health check response error")
+		}
+	})
 	srv := &http.Server{
 		Addr:    addr,
 		Handler: mux,
@@ -234,34 +238,5 @@ func runMetricsServer(ctx context.Context, addr string) {
 	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		globalLogger.Error().Err(err).Msg("Metrics server failed")
-	}
-}
-
-func runHealthServer(ctx context.Context, addr string) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("ok")); err != nil {
-			globalLogger.Error().Err(err).Msg("Health check response error")
-		}
-	})
-
-	srv := &http.Server{
-		Addr:    addr,
-		Handler: mux,
-		BaseContext: func(net.Listener) context.Context {
-			return ctx
-		},
-		ReadHeaderTimeout: 5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
-
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		globalLogger.Error().Err(err).Msg("Health server failed")
 	}
 }
