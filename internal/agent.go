@@ -30,9 +30,10 @@ func (a *Agent) Serve(l net.Listener) error {
 	return agent.Serve(l)
 }
 
-func (a *Agent) ReplaceApplications(newApps map[string]*Application) {
+func (a *Agent) ReplaceApplications(newApps map[string]*Application, defaultApp *Application) {
 	a.mtx.Lock()
 	a.Applications = newApps
+	a.DefaultApplication = defaultApp
 	a.mtx.Unlock()
 }
 
@@ -95,13 +96,13 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 
 	a.mtx.RLock()
 	app := a.Applications[appName]
-	a.mtx.RUnlock()
 	if app == nil && a.DefaultApplication != nil {
 		// If we cannot resolve the app but the default app is configured,
 		// we use the latter to process the request.
 		app = a.DefaultApplication
 		a.Logger.Debug().Str("app", appName).Msg("app not found, using default app")
 	}
+	a.mtx.RUnlock()
 	if app == nil {
 		// If we cannot resolve the app, we fail as this is an invalid configuration.
 		a.Logger.Panic().Str("app", appName).Msg("app not found")
