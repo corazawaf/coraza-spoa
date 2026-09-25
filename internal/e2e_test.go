@@ -192,13 +192,10 @@ func setupCorazaAgent(tb testing.TB, directives string) (*Agent, string, string)
 	}
 
 	a := &Agent{
-		Context:            context.Background(),
-		DefaultApplication: application,
-		Applications: map[string]*Application{
-			"default": application,
-		},
-		Logger: logger,
+		Context: context.Background(),
+		Logger:  logger,
 	}
+	a.ReplaceApplications(map[string]*Application{"default": application}, application)
 
 	return a, s.URL, s.Listener.Addr().String()
 }
