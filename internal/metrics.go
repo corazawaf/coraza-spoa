@@ -1,89 +1,101 @@
 package internal
 
 import (
+	"errors"
+	"strconv"
+
+	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
+	"github.com/corazawaf/coraza/v3/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	handleSPOEDuration = promauto.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "coraza_handle_spoe_duration_seconds",
-			Help:    "Duration of Coraza SPOE handling",
-			Buckets: prometheus.DefBuckets,
-		},
-	)
+	rulesetInfo = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "coraza_ruleset_info",
+		Help: "Ruleset versions observed while loading the active application configuration; always 1.",
+	}, []string{"application", "ruleset", "version"})
 
-	// Counter for the number of HTTP requests processed (counted on coraza-req)
-	handleSPOECount = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Name: "coraza_handle_spoe_count",
-			Help: "Total number of HTTP requests handled via coraza-req",
-		},
-	)
+	handleSPOEDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "coraza_handle_spoe_duration_seconds",
+		Help:    "Duration of Coraza SPOE message handling by application, phase, and handler result.",
+		Buckets: prometheus.DefBuckets,
+	}, []string{"application", "phase", "result"})
 
-	// Counter of responses by severity
-	handleResponsesBySeverity = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "coraza_handle_responses_severity",
-			Help: "Number of responses by severity",
-		},
-		[]string{"severity"},
-	)
+	requestsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "coraza_requests_total",
+		Help: "Total number of HTTP requests received for WAF evaluation.",
+	}, []string{"application"})
 
-	// Counter of responses by rule
-	handleResponsesByRule = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "coraza_handle_responses_rules",
-			Help: "Number of responses by rule ID",
-		},
-		[]string{"rule_id"},
-	)
+	transactionsTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "coraza_transactions_total",
+		Help: "Total number of finished WAF transactions by evaluation outcome, SPOE mode, application, and suspicious classification; outcomes do not imply HAProxy enforcement.",
+	}, []string{"application", "mode", "outcome", "suspicious"})
 
-	// Gauge for OWASP CRS version
-	handleVersion = promauto.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "coraza_handle_version",
-			Help: "OWASP CRS version information",
-		},
-		[]string{"version"},
-	)
+	ruleMatchesTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "coraza_rule_matches_total",
+		Help: "Total number of matched rules in finished WAF transactions.",
+	}, []string{"application", "rule_id", "severity"})
 
-	// action: interruption verdict (deny/drop/redirect) or "allow".
-	// application: requested SPOE "app" arg, or default_application's name
-	// when fallback handles an unknown app. Bounded by applications[].name.
-	actionsTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "coraza_actions_total",
-			Help: "Total number of WAF verdicts by action and application",
-		},
-		[]string{"action", "application"},
-	)
-
-	// rule_id: CRS attack ranges only (isAttackRule); ~400 IDs in CRS v4.
-	// severity: types.RuleSeverity.String() - 9-value enum.
-	ruleTriggersTotal = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "coraza_rule_triggers_total",
-			Help: "Total number of CRS attack-rule matches by rule ID and severity",
-		},
-		[]string{"rule_id", "severity"},
-	)
-
-	anomalyScore = promauto.NewHistogram(
-		prometheus.HistogramOpts{
-			Name:    "coraza_anomaly_score",
-			Help:    "Distribution of CRS blocking inbound anomaly scores",
-			Buckets: []float64{0, 3, 5, 7, 10, 15, 25, 50, 100},
-		},
-	)
-
-	// Counts requests let through despite triggering at least one scored rule.
-	// (score > 0 and < tx.inbound_anomaly_score_threshold).
-	suspiciousRequestsTotal = promauto.NewCounter(
-		prometheus.CounterOpts{
-			Name: "coraza_suspicious_requests_total",
-			Help: "Requests with non-zero anomaly score below the CRS blocking threshold (suspicious but not blocked)",
-		},
-	)
+	inboundAnomalyScore = promauto.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "coraza_inbound_anomaly_score",
+		Help:    "CRS blocking inbound anomaly scores observed at transaction completion, when available.",
+		Buckets: []float64{0, 3, 5, 7, 10, 15, 25, 50, 100},
+	}, []string{"application"})
 )
+
+// Called by the owner of a transaction after logging and before Close, exactly
+// once, including asynchronous responses and expired response correlations.
+// Keep this independent of exporting SPOE variables and error-log callbacks.
+func recordTransactionMetrics(tx types.Transaction, evaluationErr error, application string, detectOnly, expired bool) {
+	outcome := "allow"
+	var interruption ErrInterrupted
+	switch {
+	case expired:
+		outcome = "expired"
+	case evaluationErr != nil && !errors.As(evaluationErr, &interruption):
+		outcome = "error"
+	case tx.IsInterrupted():
+		outcome = "interrupted"
+		switch action := tx.Interruption().Action; action {
+		case "deny", "drop", "redirect":
+			outcome = action
+		}
+	}
+	mode := "enforce"
+	if detectOnly {
+		mode = "detect_only"
+	}
+	suspicious := "false"
+	// Every completed transaction contributes to exactly one label set, including
+	// transactions without a usable score or threshold.
+	defer func() {
+		transactionsTotal.WithLabelValues(application, mode, outcome, suspicious).Inc()
+	}()
+	for _, match := range tx.MatchedRules() {
+		ruleMatchesTotal.WithLabelValues(application, strconv.Itoa(match.Rule().ID()), match.Rule().Severity().String()).Inc()
+	}
+	state, ok := tx.(plugintypes.TransactionState)
+	if !ok {
+		return
+	}
+	score, ok := parseTransactionScore(state, "blocking_inbound_anomaly_score")
+	if !ok {
+		return
+	}
+	inboundAnomalyScore.WithLabelValues(application).Observe(float64(score))
+	if outcome == "allow" && score > 0 {
+		if threshold, ok := parseTransactionScore(state, "inbound_anomaly_score_threshold"); ok && score < threshold {
+			suspicious = "true"
+		}
+	}
+}
+
+func parseTransactionScore(tx plugintypes.TransactionState, name string) (int64, bool) {
+	values := tx.Variables().TX().Get(name)
+	if len(values) == 0 {
+		return 0, false
+	}
+	value, err := strconv.ParseInt(values[0], 10, 64)
+	return value, err == nil && value >= 0
+}

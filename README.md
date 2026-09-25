@@ -128,43 +128,6 @@ To avoid conflicts with the OWASP Core Rule Set (CRS) and to ensure that the SPO
 * **Infrastructure & Whitelists (IDs: 100000 - 189999):** Use this range for IP whitelists, disabling specific CRS rules, or tuning (e.g., GeoIP limits). Rules in this range are **intentionally ignored** by the SPOA agent's attack counter to prevent false positives in your HAProxy metrics.
 * **Custom Attack & Hardening Rules (IDs: 190000 - 199999):** Use this range for actual security blocks and custom hardening rules. Rules in this range are actively monitored. If triggered, they will increment the `rules_hit` counter and their IDs will be exported in the `rule_ids` variable.
 
-## Prometheus Metrics
-
-When started with `--metrics-addr=<host>:<port>`, Coraza SPOA exposes Prometheus metrics at `/metrics`. The following series are available:
-
-| Metric | Type | Labels | Description |
-|---|---|---|---|
-| `coraza_handle_spoe_duration_seconds` | Histogram | - | Wall-clock duration of each SPOE message handler call, using the default Prometheus buckets. |
-| `coraza_actions_total` | CounterVec | `action`, `application` | WAF verdicts per request. `action` is `allow` when no rule interrupted, otherwise the interruption action (`deny`, `drop`, `redirect`, etc). `application` is the requested SPOE `app` arg when it matches a configured application, or the `default_application`'s name when fallback handles an unknown name - keeping the label bounded to `applications[].name` even if the SPOE `app` arg is sourced from request data (e.g. `hdr(host)`). The unmatched requested name is still logged at debug level. Counted exactly once per request - at the response phase when `ResponseCheck` is enabled, or at the request phase otherwise. |
-| `coraza_rule_triggers_total` | CounterVec | `rule_id`, `severity` | One increment per matched attack-range rule (CRS `910000-959999` and local `190000-199999`). Rules outside these ranges (whitelists, tuning) are intentionally excluded to keep cardinality bounded. `severity` is one of `emergency`, `alert`, `critical`, `error`, `warning`, `notice`, `info`, `debug`, `unknown`. |
-| `coraza_anomaly_score` | Histogram | - | Distribution of the CRS `tx.blocking_inbound_anomaly_score` observed at the end of each transaction. Buckets are tuned for CRS scoring: `0, 3, 5, 7, 10, 15, 25, 50, 100`. The `5` boundary corresponds to the default CRS deny threshold. |
-| `coraza_suspicious_requests_total` | Counter | - | Requests with a non-zero `tx.blocking_inbound_anomaly_score` that stayed below the CRS `tx.inbound_anomaly_score_threshold` (default 5, read per transaction) and were therefore not blocked. Useful for alerting on probing activity the WAF noticed but let through. |
-
-`coraza_actions_total`, `coraza_rule_triggers_total`, `coraza_anomaly_score`, and `coraza_suspicious_requests_total` are observed exactly once per transaction even when `ResponseCheck` is enabled (the response phase is treated as the final verdict; the request phase is treated as final only on interruption or when `ResponseCheck` is off).
-
-When `ResponseCheck` is enabled but HAProxy never fires `on-http-response` for a request (e.g. backend timeout, client disconnect), the transaction sits in the response-cache until `transaction_ttl_ms` expires. `coraza_rule_triggers_total`, `coraza_anomaly_score`, and `coraza_suspicious_requests_total` are still recorded from the request-phase observations when the cache evicts the orphaned transaction; `coraza_actions_total` is not - an orphaned transaction never produced a verdict, so it is excluded rather than mislabelled as `allow`.
-
-### Example queries
-
-```promql
-# Deny rate (denials per second) per application.
-sum by (application) (rate(coraza_actions_total{action="deny"}[5m]))
-
-# Deny ratio per application.
-sum by (application) (rate(coraza_actions_total{action="deny"}[5m]))
-  / sum by (application) (rate(coraza_actions_total[5m]))
-
-# Top 10 most-triggered attack rules.
-topk(10, sum by (rule_id) (rate(coraza_rule_triggers_total[15m])))
-
-# 95th percentile anomaly score over the last 15 minutes.
-histogram_quantile(0.95, sum by (le) (rate(coraza_anomaly_score_bucket[15m])))
-
-# Suspicious-but-unblocked rate - requests scored above zero but below
-# the CRS deny threshold. A sustained rise often indicates probing.
-rate(coraza_suspicious_requests_total[5m])
-```
-
 ## Docker
 
 - Build the coraza-spoa image `cd ./example ; docker compose build`
@@ -174,3 +137,85 @@ rate(coraza_suspicious_requests_total[5m])
 ## Kubernetes
 
 For deploying Coraza SPOA on Kubernetes, you can use the official Helm chart available at [corazawaf/charts](https://github.com/corazawaf/charts/tree/main/charts/coraza-spoa).
+
+### Prometheus metrics
+
+Enable the `/metrics` endpoint with `-metrics-addr=:9000`. Counters reset when
+SPOA restarts; use `rate()` or `increase()` in PromQL.
+
+| Metric | Type | Meaning |
+| --- | --- | --- |
+| `coraza_handle_spoe_duration_seconds{application,phase,result}` | Histogram | Time spent handling each SPOE message, including unknown messages. In detect-only response mode this measures dispatch, not background evaluation. |
+| `coraza_requests_total{application}` | Counter | HTTP requests received for WAF evaluation (one per transaction created). |
+| `coraza_transactions_total{application,mode,outcome,suspicious}` | Counter | Transactions finished after request evaluation, response evaluation, or expiry. |
+| `coraza_rule_matches_total{application,rule_id,severity}` | Counter | All matched rules recorded once at transaction completion, including custom IDs outside the attack ranges and rules without messages. |
+| `coraza_inbound_anomaly_score{application}` | Histogram | Final `blocking_inbound_anomaly_score`, when present and a valid nonnegative integer. Missing scores are not recorded as zero. |
+| `coraza_ruleset_info{application,ruleset,version}` | Gauge | Constant 1 for each ruleset version observed while loading the active application configuration, including included files. |
+
+The `suspicious` label is `true` for completed transactions with no interruption
+or evaluation error and a positive inbound anomaly score below their configured
+CRS threshold. All other completions use `false`, including missing or invalid
+scores/thresholds; `false` does not necessarily mean a clean request. Summing
+across this label gives the total without counting any transaction twice.
+
+The `application` label uses the configured application name, including when an
+unknown SPOE app falls back to the default application. Request counts, transaction
+completions, rule matches, anomaly scores, ruleset information, and SPOE duration
+all use this label. SPOE duration uses an empty application label if handling
+fails before an application is resolved, or the message is unknown.
+
+For SPOE duration, `phase` is `request`, `response`, or `unknown`, and `result`
+is `success`, `interrupted`, `error`, or `unknown_message`. These describe the
+handler call, not the final transaction outcome. An asynchronous detect-only
+response records dispatch success even if later evaluation interrupts or fails.
+Arbitrary incoming message names are never used as label values.
+
+Transaction `outcome` is `allow`, `deny`, `drop`, `redirect`, `interrupted`
+(other disruptive actions), `error`, or `expired` (response never arrived).
+These describe WAF evaluation, not the HTTP status or what HAProxy enforced.
+The `mode` label is `enforce` or `detect_only`, taken from the request's SPOE
+flag; it does not describe the rules' `SecRuleEngine` setting. Detect-only
+interruptions remain correlated through response evaluation and are counted
+once, including when evaluation runs in the background. Expired transactions
+contribute their available rule matches and scores, but are not considered
+successful or suspicious completions.
+
+Ruleset metadata comes from each rule's `ver` action at configuration load time,
+without waiting for a match. `OWASP_CRS/4.25.0` becomes `ruleset="OWASP_CRS"`,
+`version="4.25.0"`; splitting uses the last slash. Unqualified versions use an
+empty `ruleset` label, and rules without `ver` contribute no version metadata.
+Activating a replacement removes metadata from the previous configuration;
+failed or merely prepared configurations do not affect the metric. This reports
+versions encountered during loading, including rules subsequently disabled by
+configuration, rather than a count of enabled rules. HAProxy's `rules_hit` and
+`rule_ids` retain their existing attack-range and nonempty-message filters.
+
+Rule IDs come from configured rules and severity uses Coraza's fixed vocabulary.
+No request paths, transaction IDs, client addresses, or incoming application
+names are used as labels. Separate totals by rule or severity can be calculated
+from the same counter:
+
+```promql
+# HTTP request rate by application
+sum by (application) (rate(coraza_requests_total[5m]))
+
+# Rule matches per second by application and severity
+sum by (application, severity) (rate(coraza_rule_matches_total[5m]))
+
+# WAF verdicts per second, preserving detect-only mode
+sum by (outcome, mode) (rate(coraza_transactions_total[5m]))
+
+# Suspicious completions per second by application
+sum by (application) (rate(coraza_transactions_total{suspicious="true"}[5m]))
+
+# 95th percentile SPOE handling duration by application and phase
+histogram_quantile(0.95,
+  sum by (application, phase, le) (rate(coraza_handle_spoe_duration_seconds_bucket[5m])))
+
+# Average inbound anomaly score by application
+sum by (application) (rate(coraza_inbound_anomaly_score_sum[5m]))
+  / sum by (application) (rate(coraza_inbound_anomaly_score_count[5m]))
+```
+
+Request and completion rates can differ while responses are pending. The SPOE
+duration histogram's `_count` counts messages, so it is not an HTTP request total.

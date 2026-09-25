@@ -8,8 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"runtime/debug"
 	"net/netip"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +17,7 @@ import (
 
 	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
 	"github.com/corazawaf/coraza/v3"
+	"github.com/corazawaf/coraza/v3/experimental"
 	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
 	"github.com/corazawaf/coraza/v3/types"
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
@@ -26,6 +27,8 @@ import (
 )
 
 type AppConfig struct {
+	// Name is the configured application name, never the incoming SPOE app value.
+	Name           string
 	Directives     string
 	ResponseCheck  bool
 	Logger         zerolog.Logger
@@ -33,19 +36,26 @@ type AppConfig struct {
 	LogFormat      string
 }
 
+type rulesetVersion struct {
+	name    string
+	version string
+}
+
 type Application struct {
-	waf     coraza.WAF
-	cache   *ttlCache
-	asyncWg sync.WaitGroup
-	asyncMu sync.Mutex
+	rulesets map[rulesetVersion]struct{}
+	waf      coraza.WAF
+	cache    *ttlCache
+	asyncWg  sync.WaitGroup
+	asyncMu  sync.Mutex
 	draining bool
 
 	AppConfig
 }
 
 type transaction struct {
-	tx types.Transaction
-	m  sync.Mutex
+	tx         types.Transaction
+	detectOnly bool
+	m          sync.Mutex
 }
 
 type applicationRequest struct {
@@ -154,6 +164,7 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 	}
 
 	tx := a.waf.NewTransactionWithID(req.ID)
+	requestsTotal.WithLabelValues(a.Name).Inc()
 	defer func() {
 		// Cache the transaction for response-phase correlation when response
 		// checking is enabled and either:
@@ -174,22 +185,19 @@ func (a *Application) HandleRequest(ctx context.Context, writer *encoding.Action
 		if a.ResponseCheck {
 			var interruption ErrInterrupted
 			if err == nil || (req.DetectOnly && errors.As(err, &interruption)) {
-				a.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx}, a.TransactionTTL)
+				a.cache.SetWithExpiration(tx.ID(), &transaction{tx: tx, detectOnly: req.DetectOnly}, a.TransactionTTL)
 				return
 			}
 		}
 
 		tx.ProcessLogging()
+		recordTransactionMetrics(tx, err, a.Name, req.DetectOnly, false)
 		if err := tx.Close(); err != nil {
 			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
 		}
 	}()
 
-	// final=true means no response phase will follow, which avoids Prometheus
-	// double-counting when ResponseCheck is on.
-	defer func() {
-		_ = exportWAFMetrics(writer, tx, req.ExportRuleIDs, err != nil || !a.ResponseCheck)
-	}()
+	defer exportWAFMetrics(writer, tx, req.ExportRuleIDs)
 
 	if err := writer.SetString(encoding.VarScopeTransaction, "id", tx.ID()); err != nil {
 		return err
@@ -366,8 +374,10 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		return nil
 	}
 
+	var evaluationErr error
 	closeTx := func() {
 		tx.ProcessLogging()
+		recordTransactionMetrics(tx, evaluationErr, a.Name, t.detectOnly, false)
 		if err := tx.Close(); err != nil {
 			a.Logger.Error().Str("tx", tx.ID()).Err(err).Msg("failed to close transaction")
 		}
@@ -381,8 +391,9 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 			a.asyncMu.Unlock()
 			// Shutdown in progress; fall back to synchronous evaluation.
 			defer closeTx()
-			defer exportWAFMetrics(writer, tx, res.ExportRuleIDs, true)
-			return process(res.Headers, res.Body)
+			defer exportWAFMetrics(writer, tx, res.ExportRuleIDs)
+			evaluationErr = process(res.Headers, res.Body)
+			return evaluationErr
 		}
 		a.asyncWg.Add(1)
 		a.asyncMu.Unlock()
@@ -404,21 +415,19 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 				}
 			}()
 			defer closeTx()
-			// Writer-less: HandleResponse has returned and the SPOE writer
-			// is no longer valid. Records Prometheus only.
-			defer exportWAFMetrics(nil, tx, false, true)
 
-			if err := process(headers, body); err != nil {
-				a.Logger.Debug().Str("tx", tx.ID()).Err(err).Msg("detect-only: evaluation error")
+			evaluationErr = process(headers, body)
+			if evaluationErr != nil {
+				a.Logger.Debug().Str("tx", tx.ID()).Err(evaluationErr).Msg("detect-only: evaluation error")
 			}
 		}()
 		return nil
 	}
 
 	defer closeTx()
-	// Response phase is always final - owns the Prometheus updates.
-	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs, true)
-	return process(res.Headers, res.Body)
+	defer exportWAFMetrics(writer, tx, res.ExportRuleIDs)
+	evaluationErr = process(res.Headers, res.Body)
+	return evaluationErr
 }
 
 // DrainDetectOnly sets the draining flag to refuse new background work
@@ -433,12 +442,25 @@ func (a *Application) DrainDetectOnly() {
 func (a AppConfig) NewApplication() (*Application, error) {
 	app := Application{
 		AppConfig: a,
+		rulesets:  make(map[rulesetVersion]struct{}),
 	}
 
 	config := coraza.NewWAFConfig().
 		WithDirectives(a.Directives).
 		WithErrorCallback(app.logCallback).
 		WithRootFS(mergefs.Merge(coreruleset.FS, io.OSFS))
+
+	config = experimental.WAFConfigWithRuleObserver(config, func(rule types.RuleMetadata) {
+		version := rule.Version()
+		if version == "" {
+			return
+		}
+		var name string
+		if index := strings.LastIndexByte(version, '/'); index > 0 && index < len(version)-1 {
+			name, version = version[:index], version[index+1:]
+		}
+		app.rulesets[rulesetVersion{name: name, version: version}] = struct{}{}
+	})
 
 	waf, err := coraza.NewWAF(config)
 	if err != nil {
@@ -457,13 +479,9 @@ func (a AppConfig) NewApplication() (*Application, error) {
 			return
 		}
 
-		// Response phase never arrived (backend error, client disconnect).
-		// The SPOE writer is long gone; record request-phase observations
-		// so orphans aren't silently dropped from Prometheus.
-		_ = exportWAFMetrics(nil, t.tx, false, true)
-
 		// Process Logging won't do anything if TX was already logged.
 		t.tx.ProcessLogging()
+		recordTransactionMetrics(t.tx, nil, a.Name, t.detectOnly, true)
 		if err := t.tx.Close(); err != nil {
 			a.Logger.Error().Err(err).Str("tx", t.tx.ID()).Msg("error closing transaction")
 		}
@@ -538,17 +556,9 @@ func phaseToString(phase types.RulePhase) string {
 }
 
 func (a *Application) logCallback(mr types.MatchedRule) {
-	rule := mr.Rule()
-	severity := rule.Severity()
-	handleResponsesBySeverity.WithLabelValues(severity.String()).Inc()
-	handleResponsesByRule.WithLabelValues(strconv.Itoa(rule.ID())).Inc()
-	if version := rule.Version(); version != "" && len(version) < 256 {
-		handleVersion.WithLabelValues(version).Set(1)
-	}
-
 	var l *zerolog.Event
 
-	switch rule.Severity() {
+	switch mr.Rule().Severity() {
 	case types.RuleSeverityWarning:
 		l = a.Logger.Warn()
 	case types.RuleSeverityNotice,
@@ -594,19 +604,10 @@ func isAttackRule(ruleID int) bool {
 	return isFTWAttack || isCustomAttack
 }
 
-// exportWAFMetrics records the WAF results for tx.
-//
-// writer: if non-nil, pushes rules_hit / anomaly_score / (rule_ids) to
-// HAProxy. Nil outside an active SPOE exchange (TTL-eviction of an orphan
-// ResponseCheck transaction).
-//
-// final: if true, also updates Prometheus. Must be true at most once per
-// transaction - tx.MatchedRules() is cumulative across phases, so counting
-// on every call under ResponseCheck would double-count.
-func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, exportRuleIDs bool, final bool) error {
+func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, exportRuleIDs bool) error {
 	matchedRules := tx.MatchedRules()
 	var ids []string
-	if writer != nil && exportRuleIDs {
+	if exportRuleIDs {
 		ids = make([]string, 0, len(matchedRules))
 	}
 	var count int64
@@ -620,19 +621,13 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, expor
 			continue
 		}
 
-		if final {
-			ruleTriggersTotal.WithLabelValues(strconv.Itoa(mr.Rule().ID()), mr.Rule().Severity().String()).Inc()
-		}
-
-		if writer != nil && exportRuleIDs {
+		if exportRuleIDs {
 			ids = append(ids, strconv.Itoa(mr.Rule().ID()))
 		}
 		count++
 	}
-	if writer != nil {
-		if err := writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count); err != nil {
-			return err
-		}
+	if err := writer.SetInt64(encoding.VarScopeTransaction, "rules_hit", count); err != nil {
+		return err
 	}
 
 	if txState, ok := tx.(plugintypes.TransactionState); ok {
@@ -645,31 +640,13 @@ func exportWAFMetrics(writer *encoding.ActionWriter, tx types.Transaction, expor
 			}
 			score = v
 		}
-		if final {
-			anomalyScore.Observe(float64(score))
-			// "Suspicious but unblocked"
-			// tx.Interruption() filters out request-phase blocks (which can also have score > 0 after rule 949110 fires).
-			if score > 0 && tx.Interruption() == nil {
-				threshold := int64(5)
-				if t := txState.Variables().TX().Get("inbound_anomaly_score_threshold"); len(t) > 0 {
-					if v, err := strconv.ParseInt(t[0], 10, 64); err == nil {
-						threshold = v
-					}
-				}
-				if score < threshold {
-					suspiciousRequestsTotal.Inc()
-				}
-			}
+		if err := writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", score); err != nil {
+			return err
 		}
-		if writer != nil {
-			if err := writer.SetInt64(encoding.VarScopeTransaction, "anomaly_score", score); err != nil {
-				return err
-			}
 
-			if exportRuleIDs {
-				if err := writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ",")); err != nil {
-					return err
-				}
+		if exportRuleIDs {
+			if err := writer.SetString(encoding.VarScopeTransaction, "rule_ids", strings.Join(ids, ",")); err != nil {
+				return err
 			}
 		}
 	}

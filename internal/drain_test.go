@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -46,7 +47,10 @@ func buildDetectOnlyMessage(t *testing.T, txID string) (*encoding.ActionWriter, 
 		t.Fatal(err)
 	}
 
-	scanner := encoding.NewKVScanner(kvBuf[:kw.Off()], 4)
+	if err := kw.SetBool("exportRuleIDs", true); err != nil {
+		t.Fatal(err)
+	}
+	scanner := encoding.NewKVScanner(kvBuf[:kw.Off()], 5)
 	msg := &encoding.Message{KV: scanner}
 	aw := encoding.NewActionWriter(make([]byte, 4096), 0)
 	return aw, msg
@@ -109,6 +113,22 @@ func TestDrainDetectOnly_FallbackToSync(t *testing.T) {
 	err := app.HandleResponse(context.Background(), aw, msg)
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
+	}
+
+	// The synchronous fallback must still return the transaction observations to
+	// HAProxy, just like the normal synchronous response path.
+	expected := encoding.NewActionWriter(make([]byte, 4096), 0)
+	if err := expected.SetInt64(encoding.VarScopeTransaction, "rules_hit", 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := expected.SetInt64(encoding.VarScopeTransaction, "anomaly_score", 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := expected.SetString(encoding.VarScopeTransaction, "rule_ids", ""); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(aw.Bytes(), expected.Bytes()) {
+		t.Fatalf("unexpected response variables: got %x, want %x", aw.Bytes(), expected.Bytes())
 	}
 
 	// Verify no async work was queued (WaitGroup counter should be zero
