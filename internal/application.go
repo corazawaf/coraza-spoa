@@ -374,7 +374,7 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 		return nil
 	}
 
-	var evaluationErr error
+	evaluationErr := errors.New("response evaluation did not complete")
 	closeTx := func() {
 		tx.ProcessLogging()
 		recordTransactionMetrics(tx, evaluationErr, a.Name, t.detectOnly, false)
