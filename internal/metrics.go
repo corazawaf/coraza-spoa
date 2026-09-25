@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	rulesetInfo = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "coraza_ruleset_info",
-		Help: "Ruleset versions observed while loading the active application configuration; always 1.",
-	}, []string{"application", "ruleset", "version"})
+	rulesetInfo = prometheus.NewDesc(
+		"coraza_ruleset_info",
+		"Ruleset versions observed while loading the active application configuration; always 1.",
+		[]string{"application", "ruleset", "version"}, nil,
+	)
 
 	handleSPOEDuration = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "coraza_handle_spoe_duration_seconds",
@@ -43,6 +44,21 @@ var (
 		Buckets: []float64{0, 3, 5, 7, 10, 15, 25, 50, 100},
 	}, []string{"application"})
 )
+
+func (a *Agent) Describe(ch chan<- *prometheus.Desc) {
+	ch <- rulesetInfo
+}
+
+func (a *Agent) Collect(ch chan<- prometheus.Metric) {
+	a.mtx.RLock()
+	apps := a.Applications
+	a.mtx.RUnlock()
+	for name, app := range apps {
+		for ruleset := range app.rulesets {
+			ch <- prometheus.MustNewConstMetric(rulesetInfo, prometheus.GaugeValue, 1, name, ruleset.name, ruleset.version)
+		}
+	}
+}
 
 // Called by the owner of a transaction after logging and before Close, exactly
 // once, including asynchronous responses and expired response correlations.

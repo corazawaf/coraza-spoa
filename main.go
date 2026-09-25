@@ -16,6 +16,7 @@ import (
 	"runtime/pprof"
 	"syscall"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 
@@ -126,6 +127,7 @@ func main() {
 		Logger:  globalLogger,
 	}
 	a.ReplaceApplications(apps, apps[cfg.DefaultApplication])
+	prometheus.MustRegister(a)
 	go func() {
 		defer cancelFunc()
 

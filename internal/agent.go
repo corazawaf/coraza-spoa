@@ -34,14 +34,6 @@ func (a *Agent) ReplaceApplications(newApps map[string]*Application, defaultApp 
 	a.mtx.Lock()
 	a.Applications = newApps
 	a.DefaultApplication = defaultApp
-	// Publish only successfully activated configurations, never partially loaded
-	// replacements. Reset also removes versions and applications no longer used.
-	rulesetInfo.Reset()
-	for name, app := range newApps {
-		for ruleset := range app.rulesets {
-			rulesetInfo.WithLabelValues(name, ruleset.name, ruleset.version).Set(1)
-		}
-	}
 	a.mtx.Unlock()
 }
 

@@ -302,6 +302,8 @@ func setupCorazaAgent(tb testing.TB, directives string) (*Agent, string, string)
 		Logger:  logger,
 	}
 	a.ReplaceApplications(map[string]*Application{"default": application}, application)
+	prometheus.MustRegister(a)
+	tb.Cleanup(func() { prometheus.Unregister(a) })
 
 	tb.Cleanup(func() { a.DrainDetectOnly(); application.cache.stop() })
 	return a, s.URL, s.Listener.Addr().String()
