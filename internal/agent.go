@@ -5,10 +5,10 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 	"github.com/dropmorepackets/haproxy-go/spop"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )
 
@@ -60,8 +60,11 @@ func (a *Agent) DrainDetectOnly() {
 }
 
 func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) {
-	timer := prometheus.NewTimer(handleSPOEDuration)
-	defer timer.ObserveDuration()
+	started := time.Now()
+	application, phase, result := "", "unknown", "error"
+	defer func() {
+		handleSPOEDuration.WithLabelValues(application, phase, result).Observe(time.Since(started).Seconds())
+	}()
 
 	const (
 		messageCorazaRequest  = "coraza-req"
@@ -71,10 +74,13 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 	var messageHandler func(*Application, context.Context, *encoding.ActionWriter, *encoding.Message) error
 	switch name := string(message.NameBytes()); name {
 	case messageCorazaRequest:
+		phase = "request"
 		messageHandler = (*Application).HandleRequest
 	case messageCorazaResponse:
+		phase = "response"
 		messageHandler = (*Application).HandleResponse
 	default:
+		result = "unknown_message"
 		a.Logger.Debug().Str("message", name).Msg("unknown spoe message")
 		return
 	}
@@ -109,13 +115,16 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		return
 	}
 
+	application = app.Name
 	err := messageHandler(app, ctx, writer, message)
 	if err == nil {
+		result = "success"
 		return
 	}
 
 	var interruption ErrInterrupted
 	if err != nil && errors.As(err, &interruption) {
+		result = "interrupted"
 		_ = writer.SetInt64(encoding.VarScopeTransaction, "status", int64(interruption.Interruption.Status))
 		_ = writer.SetString(encoding.VarScopeTransaction, "action", interruption.Interruption.Action)
 		_ = writer.SetString(encoding.VarScopeTransaction, "data", interruption.Interruption.Data)
