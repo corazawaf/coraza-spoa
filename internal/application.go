@@ -40,6 +40,8 @@ type Application struct {
 	asyncMu sync.Mutex
 	draining bool
 
+	responseCheckDisabledOnce sync.Once
+
 	AppConfig
 }
 
@@ -271,7 +273,13 @@ type applicationResponse struct {
 
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	if !a.ResponseCheck {
-		return fmt.Errorf("%w: response check is disabled", ErrResponseNotCorrelated)
+		// HAProxy is sending coraza-res although this application does not
+		// check responses. That is static configuration, not a per-request
+		// failure, so acknowledge without a verdict and say so once.
+		a.responseCheckDisabledOnce.Do(func() {
+			a.Logger.Warn().Msg("received coraza-res but response_check is disabled for this application, ignoring responses")
+		})
+		return nil
 	}
 
 	k := encoding.AcquireKVEntry()
@@ -317,18 +325,18 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}
 
 	if res.ID == "" {
-		return fmt.Errorf("%w: response id is empty", ErrResponseNotCorrelated)
+		return ErrResponseNotCorrelated{Reason: ReasonMissingID}
 	}
 
 	cv, ok := a.cache.Get(res.ID)
 	if !ok {
-		return fmt.Errorf("%w: transaction not found: %s", ErrResponseNotCorrelated, res.ID)
+		return ErrResponseNotCorrelated{Reason: ReasonNotFound, ID: res.ID}
 	}
 	a.cache.Remove(res.ID)
 
 	t := cv.(*transaction)
 	if !t.m.TryLock() {
-		return fmt.Errorf("%w: transaction is already being deleted: %s", ErrResponseNotCorrelated, res.ID)
+		return ErrResponseNotCorrelated{Reason: ReasonClosing, ID: res.ID}
 	}
 	tx := t.tx
 
@@ -545,14 +553,68 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 	}
 }
 
+// CorrelationFailure is the reason a coraza-res message could not be matched
+// to the transaction started by its coraza-req message.
+type CorrelationFailure int
+
+const (
+	// ReasonMissingID means the coraza-res message carried no id, which is
+	// a HAProxy configuration error (id=var(txn.<prefix>.id) is missing).
+	ReasonMissingID CorrelationFailure = iota + 1
+	// ReasonNotFound means no transaction is cached for the id: coraza-req
+	// was never sent for this request, its transaction_ttl_ms expired before
+	// the response arrived, or another response with the same id consumed it.
+	ReasonNotFound
+	// ReasonClosing means the transaction was found but is being closed
+	// concurrently, typically by TTL eviction racing the response.
+	ReasonClosing
+)
+
+// String returns the reason as used in the uncorrelated responses metric.
+func (r CorrelationFailure) String() string {
+	switch r {
+	case ReasonMissingID:
+		return "missing_id"
+	case ReasonNotFound:
+		return "not_found"
+	case ReasonClosing:
+		return "closing"
+	default:
+		return "unknown"
+	}
+}
+
+// ErrorCode is the value written to txn.<prefix>.error. The codes start at
+// 1000 so they never overlap the codes HAProxy itself writes via SPOE
+// set-on-error, while still matching the usual "-m int gt 0" deny rule.
+func (r CorrelationFailure) ErrorCode() int64 {
+	return 1000 + int64(r)
+}
+
 // ErrResponseNotCorrelated indicates that a coraza-res message could not be
-// matched to a transaction started by a preceding coraza-req message. This
-// happens under expected operating conditions such as a HAProxy config that
-// dispatches coraza-res without a corresponding coraza-req (e.g. rule
-// ordering, an ACL short-circuiting the request phase), a transaction whose
-// TTL has already expired, or a race with concurrent processing of the same
-// id. It is not a protocol violation and must not tear down the SPOE stream.
-var ErrResponseNotCorrelated = errors.New("response not correlated to a transaction")
+// matched to a transaction started by a preceding coraza-req message. The
+// response-phase rules could not run, so the agent must fail closed by
+// reporting an error to HAProxy, but it must not tear down the SPOE stream:
+// the failure is scoped to this single message.
+type ErrResponseNotCorrelated struct {
+	Reason CorrelationFailure
+	ID     string
+}
+
+func (e ErrResponseNotCorrelated) Error() string {
+	switch e.Reason {
+	case ReasonMissingID:
+		return "response has no id: coraza-res must pass the id set by coraza-req (id=var(txn.<prefix>.id))"
+	case ReasonNotFound:
+		return fmt.Sprintf("no transaction for response id %q: coraza-req was not sent for this request, "+
+			"transaction_ttl_ms expired before the response arrived, or the id was reused", e.ID)
+	case ReasonClosing:
+		return fmt.Sprintf("transaction for response id %q is being closed concurrently, "+
+			"most likely by TTL eviction: consider raising transaction_ttl_ms", e.ID)
+	default:
+		return fmt.Sprintf("response id %q not correlated to a transaction", e.ID)
+	}
+}
 
 type ErrInterrupted struct {
 	Interruption *types.Interruption

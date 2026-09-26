@@ -5,12 +5,17 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/dropmorepackets/haproxy-go/pkg/encoding"
 	"github.com/dropmorepackets/haproxy-go/spop"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )
+
+// uncorrelatedLogSampler limits the uncorrelated response log to a burst per
+// period; coraza_response_uncorrelated_total counts every occurrence.
+var uncorrelatedLogSampler = &zerolog.BurstSampler{Burst: 10, Period: time.Minute}
 
 type Agent struct {
 	Context            context.Context
@@ -125,11 +130,22 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		return
 	}
 
-	if errors.Is(err, ErrResponseNotCorrelated) {
-		// Expected under normal operation (see ErrResponseNotCorrelated doc).
-		// Acknowledge without setting any vars instead of tearing down the
-		// SPOE stream: HAProxy proceeds as if no verdict was given.
-		a.Logger.Warn().Err(err).Msg("could not correlate response, ignoring")
+	var notCorrelated ErrResponseNotCorrelated
+	if errors.As(err, &notCorrelated) {
+		// The response-phase rules could not run. Fail closed by reporting an
+		// error the same way HAProxy's set-on-error would, so configs that deny
+		// on txn.<prefix>.error keep doing so, but keep the SPOE stream alive.
+		_ = writer.SetInt64(encoding.VarScopeTransaction, "error", notCorrelated.Reason.ErrorCode())
+		responseUncorrelatedTotal.WithLabelValues(notCorrelated.Reason.String()).Inc()
+
+		// A misconfigured frontend hits this on every response, so sample the
+		// log and rely on the metric for the full count.
+		l := a.Logger.Sample(uncorrelatedLogSampler)
+		ev := l.Warn()
+		if notCorrelated.Reason == ReasonMissingID {
+			ev = l.Error()
+		}
+		ev.Err(err).Str("reason", notCorrelated.Reason.String()).Msg("could not correlate response to a transaction")
 		return
 	}
 

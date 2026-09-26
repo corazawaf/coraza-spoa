@@ -13,4 +13,11 @@ var (
 			Buckets: prometheus.DefBuckets,
 		},
 	)
+	responseUncorrelatedTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "coraza_response_uncorrelated_total",
+			Help: "Number of coraza-res messages that could not be matched to a transaction, by reason",
+		},
+		[]string{"reason"},
+	)
 )
