@@ -160,6 +160,7 @@ func (c config) newApplications() (map[string]*internal.Application, error) {
 		}
 
 		appConfig := internal.AppConfig{
+			Name:           a.Name,
 			Logger:         logger,
 			Directives:     a.Directives,
 			ResponseCheck:  a.ResponseCheck,
