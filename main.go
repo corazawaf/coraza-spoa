@@ -15,6 +15,7 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 	"syscall"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
@@ -43,7 +44,7 @@ func main() {
 	flag.BoolVar(&autoReload, "autoreload", false, "reload configuration file on k8s configmap update")
 	flag.StringVar(&cpuProfile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memProfile, "memprofile", "", "write memory profile to `file`")
-	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics")
+	flag.StringVar(&metricsAddr, "metrics-addr", "", "ip:port bind for prometheus metrics and health checks")
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 	flag.Parse()
 
@@ -135,10 +136,31 @@ func main() {
 		}
 	}()
 
+	var metricsServer *http.Server
+	var metricsDone chan struct{}
 	if metricsAddr != "" {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+			if _, err := w.Write([]byte("ok")); err != nil {
+				globalLogger.Error().Err(err).Msg("Health check response error")
+			}
+		})
+		metricsServer = &http.Server{
+			Addr:              metricsAddr,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+		metricsDone = make(chan struct{})
 		go func() {
-			http.Handle("/metrics", promhttp.Handler())
-			if err := http.ListenAndServe(metricsAddr, nil); err != nil {
+			defer close(metricsDone)
+			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				globalLogger.Error().Err(err).Msg("Metrics server failed")
 			}
 		}()
@@ -160,7 +182,6 @@ outer:
 		switch sig {
 		case syscall.SIGTERM:
 			globalLogger.Info().Msg("Received SIGTERM, shutting down...")
-			// this return will run cancel() and close the server
 			break outer
 		case syscall.SIGINT:
 			globalLogger.Info().Msg("Received SIGINT, shutting down...")
@@ -178,6 +199,17 @@ outer:
 
 	// Stop accepting new connections before draining background work.
 	cancelFunc()
+	if metricsServer != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+			globalLogger.Error().Err(err).Msg("Failed to shut down metrics server")
+			if err := metricsServer.Close(); err != nil {
+				globalLogger.Error().Err(err).Msg("Failed to close metrics server")
+			}
+		}
+		cancel()
+		<-metricsDone
+	}
 
 	// Drain in-flight detect-only background evaluations before exit.
 	a.DrainDetectOnly()
