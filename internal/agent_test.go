@@ -101,10 +101,11 @@ func errorVarActions(t *testing.T, code int64) []byte {
 
 func TestHandleSPOE_UncorrelatedResponseFailsClosed(t *testing.T) {
 	tests := []struct {
-		name   string
-		id     string
-		setup  func(t *testing.T, app *Application)
-		reason CorrelationFailure
+		name                  string
+		id                    string
+		responseCheckDisabled bool
+		setup                 func(t *testing.T, app *Application)
+		reason                CorrelationFailure
 	}{
 		{
 			name:   "no preceding coraza-req",
@@ -120,7 +121,11 @@ func TestHandleSPOE_UncorrelatedResponseFailsClosed(t *testing.T) {
 			id:   "closing",
 			setup: func(t *testing.T, app *Application) {
 				tx := app.waf.NewTransactionWithID("closing")
-				t.Cleanup(func() { _ = tx.Close() })
+				t.Cleanup(func() {
+					if err := tx.Close(); err != nil {
+						t.Errorf("closing transaction: %v", err)
+					}
+				})
 				cached := &transaction{tx: tx}
 				// Simulate TTL eviction holding the transaction.
 				cached.m.Lock()
@@ -128,11 +133,17 @@ func TestHandleSPOE_UncorrelatedResponseFailsClosed(t *testing.T) {
 			},
 			reason: ReasonClosing,
 		},
+		{
+			name:                  "response check disabled",
+			id:                    "whatever",
+			responseCheckDisabled: true,
+			reason:                ReasonResponseCheckDisabled,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a, app := newTestAgent(t, true)
+			a, app := newTestAgent(t, !tt.responseCheckDisabled)
 			if tt.setup != nil {
 				tt.setup(t, app)
 			}
@@ -160,17 +171,5 @@ func TestHandleSPOE_UncorrelatedResponseFailsClosed(t *testing.T) {
 				t.Errorf("coraza_response_uncorrelated_total{reason=%q} increased by %v, want 1", tt.reason, d)
 			}
 		})
-	}
-}
-
-func TestHandleSPOE_ResponseCheckDisabled(t *testing.T) {
-	a, _ := newTestAgent(t, false)
-
-	msg := buildSPOEMessage(t, "coraza-res", func(kw *encoding.KVWriter) error {
-		return kw.SetString("id", "whatever")
-	})
-
-	if got := handleSPOE(t, a, msg); len(got) != 0 {
-		t.Errorf("expected no actions when response check is disabled, got %x", got)
 	}
 }

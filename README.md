@@ -93,6 +93,7 @@ The agent populates the following variables in the `txn` scope:
   * `1001`: `coraza-res` carried no `id` (check that it passes `id=var(txn.coraza.id)`).
   * `1002`: no transaction for the `id`: `coraza-req` was not sent for this request, `transaction_ttl_ms` expired before the response arrived, or the `id` was reused.
   * `1003`: the transaction was being closed concurrently, usually by TTL eviction; consider raising `transaction_ttl_ms`.
+  * `1004`: `coraza-res` was sent to an application with `response_check` disabled; enable it or stop sending `coraza-res`.
 
   Each occurrence is counted in the `coraza_response_uncorrelated_total` metric, labelled by `reason`.
 
