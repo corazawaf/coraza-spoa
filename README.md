@@ -89,7 +89,13 @@ The agent populates the following variables in the `txn` scope:
 * **`txn.coraza.anomaly_score`**: The total inbound anomaly score for the request.
 * **`txn.coraza.rules_hit`**: The total count of triggered attack rules.
 * **`txn.coraza.rule_ids`**: A comma-separated list of triggered Rule IDs (if enabled).
-* **`txn.coraza.error`**: Contains SPOA-related errors if the transaction fails.
+* **`txn.coraza.error`**: Contains SPOA-related errors if the transaction fails. Besides the codes HAProxy sets via `set-on-error`, the agent itself sets codes from 1000 up when a `coraza-res` cannot be matched to its `coraza-req` transaction, so the response is denied by the usual `var(txn.coraza.error) -m int gt 0` rule instead of skipping response inspection:
+  * `1001`: `coraza-res` carried no `id` (check that it passes `id=var(txn.coraza.id)`).
+  * `1002`: no transaction for the `id`: `coraza-req` was not sent for this request, `transaction_ttl_ms` expired before the response arrived, or the `id` was reused.
+  * `1003`: the transaction was being closed concurrently, usually by TTL eviction; consider raising `transaction_ttl_ms`.
+  * `1004`: `coraza-res` was sent to an application with `response_check` disabled; enable it or stop sending `coraza-res`.
+
+  Each occurrence is counted in the `coraza_response_uncorrelated_total` metric, labelled by `reason`.
 
 ### Example Log Formats
 
