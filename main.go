@@ -136,27 +136,31 @@ func main() {
 		}
 	}()
 
+	var metricsServer *http.Server
+	var metricsDone chan struct{}
 	if metricsAddr != "" {
-		go func() {
-			mux := http.NewServeMux()
-			mux.Handle("/metrics", promhttp.Handler())
-			mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-				if r.Method != http.MethodGet {
-					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-					return
-				}
-				if _, err := w.Write([]byte("ok")); err != nil {
-					globalLogger.Error().Err(err).Msg("Health check response error")
-				}
-			})
-			server := &http.Server{
-				Addr:              metricsAddr,
-				Handler:           mux,
-				ReadHeaderTimeout: 5 * time.Second,
-				WriteTimeout:      10 * time.Second,
-				IdleTimeout:       60 * time.Second,
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				return
 			}
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			if _, err := w.Write([]byte("ok")); err != nil {
+				globalLogger.Error().Err(err).Msg("Health check response error")
+			}
+		})
+		metricsServer = &http.Server{
+			Addr:              metricsAddr,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+		metricsDone = make(chan struct{})
+		go func() {
+			defer close(metricsDone)
+			if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				globalLogger.Error().Err(err).Msg("Metrics server failed")
 			}
 		}()
@@ -178,7 +182,6 @@ outer:
 		switch sig {
 		case syscall.SIGTERM:
 			globalLogger.Info().Msg("Received SIGTERM, shutting down...")
-			// this return will run cancel() and close the server
 			break outer
 		case syscall.SIGINT:
 			globalLogger.Info().Msg("Received SIGINT, shutting down...")
@@ -196,6 +199,17 @@ outer:
 
 	// Stop accepting new connections before draining background work.
 	cancelFunc()
+	if metricsServer != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+			globalLogger.Error().Err(err).Msg("Failed to shut down metrics server")
+			if err := metricsServer.Close(); err != nil {
+				globalLogger.Error().Err(err).Msg("Failed to close metrics server")
+			}
+		}
+		cancel()
+		<-metricsDone
+	}
 
 	// Drain in-flight detect-only background evaluations before exit.
 	a.DrainDetectOnly()
