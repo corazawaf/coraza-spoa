@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/corazawaf/coraza-spoa/compare/v0.7.3...v0.8.0) (2026-09-26)
+
+
+### Features
+
+* serve health checks on the metrics listener ([#398](https://github.com/corazawaf/coraza-spoa/issues/398)) ([a05e05d](https://github.com/corazawaf/coraza-spoa/commit/a05e05de59c1c990e4473d99c999d155cf4928bc))
+
+
+### Bug Fixes
+
+* **config:** replace the default application on reload ([464f1ae](https://github.com/corazawaf/coraza-spoa/commit/464f1aee5d55e883837487061d46b8ac1b34896b))
+
 ## [0.7.3](https://github.com/corazawaf/coraza-spoa/compare/v0.7.2...v0.7.3) (2026-09-01)
 
 
