@@ -271,7 +271,7 @@ type applicationResponse struct {
 
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	if !a.ResponseCheck {
-		return fmt.Errorf("got response but response check is disabled")
+		return fmt.Errorf("%w: response check is disabled", ErrResponseNotCorrelated)
 	}
 
 	k := encoding.AcquireKVEntry()
@@ -317,18 +317,18 @@ func (a *Application) HandleResponse(ctx context.Context, writer *encoding.Actio
 	}
 
 	if res.ID == "" {
-		return fmt.Errorf("response id is empty")
+		return fmt.Errorf("%w: response id is empty", ErrResponseNotCorrelated)
 	}
 
 	cv, ok := a.cache.Get(res.ID)
 	if !ok {
-		return fmt.Errorf("transaction not found: %s", res.ID)
+		return fmt.Errorf("%w: transaction not found: %s", ErrResponseNotCorrelated, res.ID)
 	}
 	a.cache.Remove(res.ID)
 
 	t := cv.(*transaction)
 	if !t.m.TryLock() {
-		return fmt.Errorf("transaction is already being deleted: %s", res.ID)
+		return fmt.Errorf("%w: transaction is already being deleted: %s", ErrResponseNotCorrelated, res.ID)
 	}
 	tx := t.tx
 
@@ -544,6 +544,15 @@ func (a *Application) logCallback(mr types.MatchedRule) {
 		l.Msg(mr.ErrorLog())
 	}
 }
+
+// ErrResponseNotCorrelated indicates that a coraza-res message could not be
+// matched to a transaction started by a preceding coraza-req message. This
+// happens under expected operating conditions such as a HAProxy config that
+// dispatches coraza-res without a corresponding coraza-req (e.g. rule
+// ordering, an ACL short-circuiting the request phase), a transaction whose
+// TTL has already expired, or a race with concurrent processing of the same
+// id. It is not a protocol violation and must not tear down the SPOE stream.
+var ErrResponseNotCorrelated = errors.New("response not correlated to a transaction")
 
 type ErrInterrupted struct {
 	Interruption *types.Interruption

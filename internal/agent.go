@@ -125,6 +125,14 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		return
 	}
 
+	if errors.Is(err, ErrResponseNotCorrelated) {
+		// Expected under normal operation (see ErrResponseNotCorrelated doc).
+		// Acknowledge without setting any vars instead of tearing down the
+		// SPOE stream: HAProxy proceeds as if no verdict was given.
+		a.Logger.Warn().Err(err).Msg("could not correlate response, ignoring")
+		return
+	}
+
 	// If the error is not an ErrInterrupted, we panic to let the spop stream fail.
 	a.Logger.Panic().Err(err).Msg("Error handling request")
 }

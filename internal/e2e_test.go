@@ -98,8 +98,9 @@ SecRuleEngine On
 		// Full detect-only: HAProxy does not enforce the verdict, so a request
 		// the WAF would deny is forwarded to the origin and its response
 		// returned. The interrupted request transaction must still be cached so
-		// the response can be correlated; otherwise HandleResponse fails with
-		// "transaction not found" and the request is denied with a 504.
+		// the response can be correlated; otherwise HandleResponse can't find
+		// it (ErrResponseNotCorrelated) and the response-phase metrics below
+		// would never be set.
 		config, _, _ := runCorazaRequestDetectOnly(t, defaultCorazaConfig)
 
 		req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/anything?arg=<script>alert(0)</script>", http.NoBody)
@@ -271,10 +272,11 @@ server httpbin %s
 // runCorazaRequestDetectOnly models full detect-only mode: HAProxy does NOT
 // enforce the WAF verdict, so requests that the WAF would deny are still
 // forwarded to the origin and their responses delivered. Both coraza-req and
-// coraza-res carry detect-only=bool(true). The only deny left is the 504 on a
-// SPOA processing error, so a failed request/response correlation (e.g. a
-// "transaction not found" because an interrupted request was not cached)
-// surfaces as a 504 instead of the expected 200.
+// coraza-res carry detect-only=bool(true). A failed request/response
+// correlation (e.g. "transaction not found" because an interrupted request
+// was not cached) is handled as ErrResponseNotCorrelated: the response-phase
+// vars (X-Anomaly-Score etc.) are simply never set, rather than surfacing as
+// a 504.
 func runCorazaRequestDetectOnly(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
 	a, binURL, backendAddr := setupCorazaAgent(tb, directives)
 
