@@ -49,8 +49,6 @@ type Application struct {
 	asyncMu  sync.Mutex
 	draining bool
 
-	responseCheckDisabledOnce sync.Once
-
 	AppConfig
 }
 
@@ -285,13 +283,7 @@ type applicationResponse struct {
 
 func (a *Application) HandleResponse(ctx context.Context, writer *encoding.ActionWriter, message *encoding.Message) (err error) {
 	if !a.ResponseCheck {
-		// HAProxy is sending coraza-res although this application does not
-		// check responses. That is static configuration, not a per-request
-		// failure, so acknowledge without a verdict and say so once.
-		a.responseCheckDisabledOnce.Do(func() {
-			a.Logger.Warn().Msg("received coraza-res but response_check is disabled for this application, ignoring responses")
-		})
-		return nil
+		return ErrResponseNotCorrelated{Reason: ReasonResponseCheckDisabled}
 	}
 
 	k := encoding.AcquireKVEntry()
@@ -600,6 +592,10 @@ const (
 	// ReasonClosing means the transaction was found but is being closed
 	// concurrently, typically by TTL eviction racing the response.
 	ReasonClosing
+	// ReasonResponseCheckDisabled means HAProxy sent coraza-res to an
+	// application with response_check disabled, whose coraza-req keeps no
+	// transaction to correlate with. This is a configuration error.
+	ReasonResponseCheckDisabled
 )
 
 // String returns the reason as used in the uncorrelated responses metric.
@@ -611,6 +607,8 @@ func (r CorrelationFailure) String() string {
 		return "not_found"
 	case ReasonClosing:
 		return "closing"
+	case ReasonResponseCheckDisabled:
+		return "response_check_disabled"
 	default:
 		return "unknown"
 	}
@@ -643,6 +641,9 @@ func (e ErrResponseNotCorrelated) Error() string {
 	case ReasonClosing:
 		return fmt.Sprintf("transaction for response id %q is being closed concurrently, "+
 			"most likely by TTL eviction: consider raising transaction_ttl_ms", e.ID)
+	case ReasonResponseCheckDisabled:
+		return "response_check is disabled for this application, so no transaction is kept for the response: " +
+			"enable response_check or stop sending coraza-res"
 	default:
 		return fmt.Sprintf("response id %q not correlated to a transaction", e.ID)
 	}
