@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.9.0](https://github.com/corazawaf/coraza-spoa/compare/v0.8.0...v0.9.0) (2026-09-27)
+
+
+### Features
+
+* **metrics:** label uncorrelated responses by application ([58f0154](https://github.com/corazawaf/coraza-spoa/commit/58f0154c1cfad31041779324fe7d481221197976))
+
+
+### Bug Fixes
+
+* deny when response check is disabled or the error can't be reported ([f70cf4e](https://github.com/corazawaf/coraza-spoa/commit/f70cf4eadc9b7879c7910994e98c8133937156d7))
+* don't panic the SPOE stream on an uncorrelated coraza-res ([013a5de](https://github.com/corazawaf/coraza-spoa/commit/013a5de84bd794e4925da9f32a0a2288a1388bb5))
+* don't panic the SPOE stream on an uncorrelated coraza-res ([b660b06](https://github.com/corazawaf/coraza-spoa/commit/b660b06f33dfacc5d396bcc6524bb8f9c30673c8)), closes [#169](https://github.com/corazawaf/coraza-spoa/issues/169)
+* fail closed on an uncorrelated coraza-res ([895864e](https://github.com/corazawaf/coraza-spoa/commit/895864e1d4d35473604f4415b862713122c03fd7))
+
 ## [0.8.0](https://github.com/corazawaf/coraza-spoa/compare/v0.7.3...v0.8.0) (2026-09-26)
 
 
