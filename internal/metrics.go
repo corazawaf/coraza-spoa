@@ -43,6 +43,11 @@ var (
 		Help:    "CRS blocking inbound anomaly scores observed at transaction completion, when available.",
 		Buckets: []float64{0, 3, 5, 7, 10, 15, 25, 50, 100},
 	}, []string{"application"})
+
+	responseUncorrelatedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "coraza_response_uncorrelated_total",
+		Help: "Total number of coraza-res messages that could not be matched to a transaction, by application and reason.",
+	}, []string{"application", "reason"})
 )
 
 func (a *Agent) Describe(ch chan<- *prometheus.Desc) {

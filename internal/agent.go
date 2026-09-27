@@ -12,6 +12,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// uncorrelatedLogSampler limits the uncorrelated response log to a burst per
+// period; coraza_response_uncorrelated_total counts every occurrence.
+var uncorrelatedLogSampler = &zerolog.BurstSampler{Burst: 10, Period: time.Minute}
+
 type Agent struct {
 	Context            context.Context
 	DefaultApplication *Application
@@ -132,6 +136,30 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 
 		a.Logger.Debug().Err(err).Msg("sending interruption")
 		return
+	}
+
+	var notCorrelated ErrResponseNotCorrelated
+	if errors.As(err, &notCorrelated) {
+		// The response-phase rules could not run. Fail closed by reporting an
+		// error the same way HAProxy's set-on-error would, so configs that deny
+		// on txn.<prefix>.error keep doing so, but keep the SPOE stream alive.
+		// If the error cannot be reported, fall through to the panic below so
+		// the failure still ends in a denial.
+		werr := writer.SetInt64(encoding.VarScopeTransaction, "error", notCorrelated.Reason.ErrorCode())
+		if werr == nil {
+			responseUncorrelatedTotal.WithLabelValues(application, notCorrelated.Reason.String()).Inc()
+
+			// A misconfigured frontend hits this on every response, so sample
+			// the log and rely on the metric for the full count.
+			l := a.Logger.Sample(uncorrelatedLogSampler)
+			ev := l.Warn()
+			if notCorrelated.Reason == ReasonMissingID || notCorrelated.Reason == ReasonResponseCheckDisabled {
+				ev = l.Error()
+			}
+			ev.Err(err).Str("app", application).Str("reason", notCorrelated.Reason.String()).Msg("could not correlate response to a transaction")
+			return
+		}
+		err = errors.Join(err, werr)
 	}
 
 	// If the error is not an ErrInterrupted, we panic to let the spop stream fail.
