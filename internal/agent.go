@@ -147,7 +147,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 		// the failure still ends in a denial.
 		werr := writer.SetInt64(encoding.VarScopeTransaction, "error", notCorrelated.Reason.ErrorCode())
 		if werr == nil {
-			responseUncorrelatedTotal.WithLabelValues(notCorrelated.Reason.String()).Inc()
+			responseUncorrelatedTotal.WithLabelValues(application, notCorrelated.Reason.String()).Inc()
 
 			// A misconfigured frontend hits this on every response, so sample
 			// the log and rely on the metric for the full count.
@@ -156,7 +156,7 @@ func (a *Agent) HandleSPOE(ctx context.Context, writer *encoding.ActionWriter, m
 			if notCorrelated.Reason == ReasonMissingID || notCorrelated.Reason == ReasonResponseCheckDisabled {
 				ev = l.Error()
 			}
-			ev.Err(err).Str("reason", notCorrelated.Reason.String()).Msg("could not correlate response to a transaction")
+			ev.Err(err).Str("app", application).Str("reason", notCorrelated.Reason.String()).Msg("could not correlate response to a transaction")
 			return
 		}
 		err = errors.Join(err, werr)

@@ -46,8 +46,8 @@ var (
 
 	responseUncorrelatedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "coraza_response_uncorrelated_total",
-		Help: "Total number of coraza-res messages that could not be matched to a transaction, by reason.",
-	}, []string{"reason"})
+		Help: "Total number of coraza-res messages that could not be matched to a transaction, by application and reason.",
+	}, []string{"application", "reason"})
 )
 
 func (a *Agent) Describe(ch chan<- *prometheus.Desc) {

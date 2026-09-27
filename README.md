@@ -95,7 +95,7 @@ The agent populates the following variables in the `txn` scope:
   * `1003`: the transaction was being closed concurrently, usually by TTL eviction; consider raising `transaction_ttl_ms`.
   * `1004`: `coraza-res` was sent to an application with `response_check` disabled; enable it or stop sending `coraza-res`.
 
-  Each occurrence is counted in the `coraza_response_uncorrelated_total` metric, labelled by `reason`.
+  Each occurrence is counted in the `coraza_response_uncorrelated_total` metric, labelled by `application` and `reason`.
 
 ### Example Log Formats
 
@@ -156,6 +156,7 @@ SPOA restarts; use `rate()` or `increase()` in PromQL.
 | `coraza_transactions_total{application,mode,outcome,suspicious}` | Counter | Transactions finished after request evaluation, response evaluation, or expiry. |
 | `coraza_rule_matches_total{application,rule_id,severity}` | Counter | All matched rules recorded once at transaction completion, including custom IDs outside the attack ranges and rules without messages. |
 | `coraza_inbound_anomaly_score{application}` | Histogram | Final `blocking_inbound_anomaly_score`, when present and a valid nonnegative integer. Missing scores are not recorded as zero. |
+| `coraza_response_uncorrelated_total{application,reason}` | Counter | `coraza-res` messages that could not be matched to a transaction and were denied through `txn.coraza.error`. `reason` is `missing_id`, `not_found`, `closing`, or `response_check_disabled`. |
 | `coraza_ruleset_info{application,ruleset,version}` | Gauge | Constant 1 for each ruleset version observed while loading the active application configuration, including included files. |
 
 The `suspicious` label is `true` for completed transactions with no interruption
@@ -166,9 +167,10 @@ across this label gives the total without counting any transaction twice.
 
 The `application` label uses the configured application name, including when an
 unknown SPOE app falls back to the default application. Request counts, transaction
-completions, rule matches, anomaly scores, ruleset information, and SPOE duration
-all use this label. SPOE duration uses an empty application label if handling
-fails before an application is resolved, or the message is unknown.
+completions, rule matches, anomaly scores, ruleset information, uncorrelated
+responses, and SPOE duration all use this label. SPOE duration uses an empty
+application label if handling fails before an application is resolved, or the
+message is unknown.
 
 For SPOE duration, `phase` is `request`, `response`, or `unknown`, and `result`
 is `success`, `interrupted`, `error`, or `unknown_message`. These describe the
