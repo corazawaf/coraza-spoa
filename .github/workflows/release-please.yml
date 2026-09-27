@@ -17,6 +17,6 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
         with:
-          # this is not recommended, but we don't run any actions on release
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # Use a PAT so release tag pushes trigger downstream workflows.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           release-type: simple
