@@ -139,6 +139,36 @@ SecRuleEngine On
 			t.Errorf("expected rule_ids to be not empty (request should still be detected)")
 		}
 		checkMetrics(resp)
+
+		// Break the correlation on purpose: coraza-e2e-skip-req stops HAProxy
+		// sending coraza-req, and a non-empty value becomes the id coraza-res
+		// carries. The agent must deny by setting txn.e2e.error itself. Failing
+		// the SPOE stream instead would leave HAProxy's set-on-error code there.
+		for _, tc := range []struct{ name, id, reason, code string }{
+			{name: "uncorrelated response without id is denied", reason: "missing_id", code: "1001"},
+			{name: "uncorrelated response with unknown id is denied", id: "unknown-id", reason: "not_found", code: "1002"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				before := gatherUncorrelatedResponses(t, tc.reason)
+				req, _ := http.NewRequest("GET", "http://127.0.0.1:"+config.FrontendPort+"/", http.NoBody)
+				req.Header.Set("coraza-e2e-skip-req", tc.id)
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					t.Fatalf("request failed: %v", err)
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode != http.StatusGatewayTimeout {
+					t.Errorf("expected status code to be \"%d\", but got \"%d\"", http.StatusGatewayTimeout, resp.StatusCode)
+				}
+				if got := resp.Header.Get("X-Coraza-Error"); got != tc.code {
+					t.Errorf("expected txn.e2e.error to be %q, got %q", tc.code, got)
+				}
+				if delta := gatherUncorrelatedResponses(t, tc.reason) - before; delta != 1 {
+					t.Errorf("uncorrelated responses for %s increased by %v, want 1", tc.reason, delta)
+				}
+			})
+		}
 	})
 
 	t.Run("ruleset versions on replacement", func(t *testing.T) {
@@ -385,7 +415,9 @@ server httpbin %s
 // SPOA processing error, so a failed request/response correlation (e.g. no
 // transaction found because an interrupted request was not cached) surfaces
 // as a 504 instead of the expected 200: the agent reports it through
-// txn.e2e.error.
+// txn.e2e.error, exposed as X-Coraza-Error. A coraza-e2e-skip-req request
+// header skips coraza-req so tests can send an uncorrelated coraza-res; a
+// non-empty value is used as its id.
 func runCorazaRequestDetectOnly(tb testing.TB, directives string) (testutil.HAProxyConfig, string, string) {
 	a, binURL, backendAddr := setupCorazaAgent(tb, directives)
 	// Use an unknown app below to verify fallback keeps the configured metric label.
@@ -402,6 +434,10 @@ func runCorazaRequestDetectOnly(tb testing.TB, directives string) (testutil.HAPr
     http-after-response set-header X-Anomaly-Score "%[var(txn.e2e.anomaly_score)]"
     http-after-response set-header X-Rules-Hit "%[var(txn.e2e.rules_hit)]"
     http-after-response set-header X-Rule-IDs "%[var(txn.e2e.rule_ids)]"
+    http-after-response set-header X-Coraza-Error "%[var(txn.e2e.error)]"
+
+    # Without coraza-req, coraza-res carries this id, or none if it is empty.
+    http-request set-var(txn.e2e.id) req.hdr(coraza-e2e-skip-req) if { req.hdr(coraza-e2e-skip-req) -m len gt 0 }
 
     # No is_deny enforcement: the WAF verdict is detected and logged but never
     # blocks, so every request reaches the origin and every response is returned.
@@ -424,7 +460,7 @@ spoe-agent e2e
 
 spoe-message coraza-req
     args app=str(unconfigured) src-ip=src src-port=src_port dst-ip=dst dst-port=dst_port method=method path=path query=query version=req.ver headers=req.hdrs body=req.body exportRuleIDs=bool(true) detect-only=bool(true)
-    event on-frontend-http-request
+    event on-frontend-http-request unless { req.hdr(coraza-e2e-skip-req) -m found }
 
 spoe-message coraza-res
     args app=str(unconfigured) id=var(txn.e2e.id) version=res.ver status=status headers=res.hdrs body=res.body exportRuleIDs=bool(true) detect-only=bool(true)
@@ -563,6 +599,30 @@ func gatherRequestMetrics(t *testing.T, outcome, mode string) requestMetrics {
 		}
 	}
 	return result
+}
+
+func gatherUncorrelatedResponses(t *testing.T, reason string) float64 {
+	t.Helper()
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var total float64
+	for _, family := range families {
+		if family.GetName() != "coraza_response_uncorrelated_total" {
+			continue
+		}
+		for _, metric := range family.Metric {
+			labels := make(map[string]string)
+			for _, label := range metric.Label {
+				labels[label.GetName()] = label.GetValue()
+			}
+			if labels["application"] == "default" && labels["reason"] == reason {
+				total += metric.GetCounter().GetValue()
+			}
+		}
+	}
+	return total
 }
 
 func checkRequestMetrics(t *testing.T, outcome, mode string, suspicious bool) func(*http.Response) {
