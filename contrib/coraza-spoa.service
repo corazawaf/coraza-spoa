@@ -50,7 +50,7 @@ InaccessiblePaths=-/opt
 InaccessiblePaths=-/srv
 #InaccessiblePaths=-/bin
 InaccessiblePaths=-/bin/bash
-inaccessiblepaths=-/bin/find
+InaccessiblePaths=-/bin/find
 InaccessiblePaths=-/bin/less
 InaccessiblePaths=-/bin/zcat
 InaccessiblePaths=-/bin/rm
@@ -302,7 +302,8 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 #RestrictNamespaces=uts ipc pid user cgroup
 
 SystemCallArchitectures=native
-SystemCallFilter=@system-service -@setuid -@ipc -@mount
+SystemCallFilter=@system-service
+SystemCallFilter=~@setuid @ipc @mount
 
 IPAddressDeny=any
 IPAddressAllow=localhost
