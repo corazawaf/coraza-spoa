@@ -21,7 +21,7 @@ import (
 	"github.com/magefile/mage/sh"
 
 	// Import as sideeffect for version detection based on build info.
-	_ "github.com/corazawaf/coraza-coreruleset/v4"
+	_ "github.com/corazawaf/coraza-coreruleset/crs/v4"
 )
 
 var addLicenseVersion = "v1.1.1" // https://github.com/google/addlicense/releases
@@ -175,7 +175,7 @@ func Ftw() error {
 	var crsVersion string
 	for _, dep := range info.Deps {
 		fmt.Printf("module: %s@%s", dep.Path, dep.Version)
-		if dep.Path == "github.com/corazawaf/coraza-coreruleset/v4" {
+		if dep.Path == "github.com/corazawaf/coraza-coreruleset/crs/v4" {
 			crsVersion = dep.Version
 			break
 		}
