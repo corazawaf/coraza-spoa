@@ -23,7 +23,6 @@ services:
     build:
       context: ..
       dockerfile: ./ftw/Dockerfile.coraza_spoa
-      network: host
     volumes:
      - ../build:/build:rw
     ports:
@@ -55,7 +54,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ftw
-      network: host
     environment:
       - FTW_CLOUDMODE
       - FTW_INCLUDE
