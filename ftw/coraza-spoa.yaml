@@ -42,7 +42,7 @@ applications:
           msg:'X-CRS-Test %{MATCHED_VAR}',\
           ctl:ruleRemoveById=1-999999"
 
-      Include @crs-setup.conf.example
+      Include @crs-setup.conf.example-nodefaultact
       Include @owasp_crs/*.conf
 
     response_check: true
