@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	crs "github.com/corazawaf/coraza-coreruleset/crs/v4"
+	lts "github.com/corazawaf/coraza-coreruleset/lts/v4"
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 )
@@ -164,7 +164,7 @@ func Check() {
 
 // Ftw runs CRS regressions tests. Requires docker.
 func Ftw() error {
-	crsVersion := crs.Version
+	crsVersion := lts.Version
 
 	env := map[string]string{
 		"FTW_CLOUDMODE":       os.Getenv("FTW_CLOUDMODE"),
