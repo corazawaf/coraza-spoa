@@ -8,7 +8,7 @@ cd /workspace
 
 step=1
 total_steps=1
-max_retries=15 # Seconds for the server reachability timeout
+max_retries=30 # Seconds for the server reachability timeout
 host=${1:-haproxy}
 health_url="http://${host}:8080"
 log_file='/build/ftw-haproxy.log'

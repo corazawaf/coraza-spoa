@@ -43,7 +43,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - haproxy -f /usr/local/etc/haproxy/haproxy.cfg > /build/ftw-haproxy.log
+      - haproxy -f /usr/local/etc/haproxy/haproxy.cfg > /build/ftw-haproxy.log 2>&1
     ports:
       - 8080:8080
 
