@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/corazawaf/coraza-spoa/compare/v0.9.0...v0.9.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/corazawaf/coraza/v3 to v3.8.1 [security] ([#405](https://github.com/corazawaf/coraza-spoa/issues/405)) ([ded94c2](https://github.com/corazawaf/coraza-spoa/commit/ded94c21b1f38747f8f2675db3ef29794944efd1))
+
 ## [0.9.0](https://github.com/corazawaf/coraza-spoa/compare/v0.8.0...v0.9.0) (2026-09-27)
 
 
