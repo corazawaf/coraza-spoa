@@ -23,7 +23,6 @@ services:
     build:
       context: ..
       dockerfile: ./ftw/Dockerfile.coraza_spoa
-      network: host
     volumes:
      - ../build:/build:rw
     ports:
@@ -44,7 +43,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - haproxy -f /usr/local/etc/haproxy/haproxy.cfg > /build/ftw-haproxy.log
+      - haproxy -f /usr/local/etc/haproxy/haproxy.cfg > /build/ftw-haproxy.log 2>&1
     ports:
       - 8080:8080
 
@@ -55,7 +54,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.ftw
-      network: host
     environment:
       - FTW_CLOUDMODE
       - FTW_INCLUDE

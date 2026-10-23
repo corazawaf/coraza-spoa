@@ -15,7 +15,10 @@ import (
 	"sync"
 	"time"
 
-	coreruleset "github.com/corazawaf/coraza-coreruleset/v4"
+	corazaconf "github.com/corazawaf/coraza-coreruleset/coraza/v3"
+	crs "github.com/corazawaf/coraza-coreruleset/crs/v4"
+	lts "github.com/corazawaf/coraza-coreruleset/lts/v4"
+	"github.com/corazawaf/coraza-coreruleset/plugins"
 	"github.com/corazawaf/coraza/v3"
 	"github.com/corazawaf/coraza/v3/experimental"
 	"github.com/corazawaf/coraza/v3/experimental/plugins/plugintypes"
@@ -448,7 +451,7 @@ func (a AppConfig) NewApplication() (*Application, error) {
 	config := coraza.NewWAFConfig().
 		WithDirectives(a.Directives).
 		WithErrorCallback(app.logCallback).
-		WithRootFS(mergefs.Merge(coreruleset.FS, io.OSFS))
+		WithRootFS(mergefs.Merge(crs.FS, lts.FS, plugins.FS, corazaconf.FS, io.OSFS))
 
 	config = experimental.WAFConfigWithRuleObserver(config, func(rule types.RuleMetadata) {
 		version := rule.Version()
